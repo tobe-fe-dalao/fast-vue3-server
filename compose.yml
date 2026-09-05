@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fastvue3
+      POSTGRES_USER: fastvue3
+      POSTGRES_PASSWORD: fastvue3
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fastvue3"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 应用本身可选加入 compose；默认仅启动基础设施，应用通过 ./mvnw spring-boot:run 本地运行
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/fastvue3
+      DATABASE_USERNAME: fastvue3
+      DATABASE_PASSWORD: fastvue3
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-random-secret-at-least-32-bytes-long}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      SPRING_PROFILES_ACTIVE: dev
+    ports:
+      - "8080:8080"
+    profiles:
+      - app
+
+volumes:
+  postgres_data:

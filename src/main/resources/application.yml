@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: fast-vue3-server
+  profiles:
+    active: dev
+  jackson:
+    default-property-inclusion: non_null
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: true
+      logic-not-delete-value: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me-to-a-random-secret-at-least-32-bytes-long}
+    access-token-ttl: 7200        # Access Token 有效期（秒）
+    refresh-token-ttl: 604800     # Refresh Token 有效期（秒，7 天）
+  admin:
+    password: ${ADMIN_PASSWORD:}
+    default-dev-password: admin123  # 仅供 dev 环境、且未配置 ADMIN_PASSWORD 时使用
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    persist-authorization: true
+  api-docs:
+    path: /v3/api-docs
