@@ -1,6 +1,8 @@
 package com.fastvue.module.user;
 
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 
 import java.util.List;
 
@@ -20,7 +22,8 @@ public record UpdateUserRequest(
         @Size(max = 32, message = "手机号长度不能超过 32")
         String phone,
 
+        @Pattern(regexp = "active|disabled", message = "用户状态只能是 active 或 disabled")
         String status,
 
-        List<Long> roleIds) {
+        List<@Positive(message = "角色 ID 必须大于 0") Long> roleIds) {
 }

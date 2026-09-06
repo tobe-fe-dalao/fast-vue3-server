@@ -13,7 +13,7 @@ import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Service;
 
@@ -40,14 +40,17 @@ public class AuthService {
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.username(), request.password()));
-        } catch (BadCredentialsException ex) {
-            log.warn("登录失败: 用户名 {} 密码错误", request.username());
+        } catch (AuthenticationException ex) {
+            log.warn("登录失败: 用户名 {} 凭证无效或账号不可用", request.username());
             throw new BusinessException(ErrorCode.INVALID_USERNAME_OR_PASSWORD);
         }
 
         UserEntity user = userMapper.selectOne(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<UserEntity>()
                         .eq(UserEntity::getUsername, request.username()));
+        if (user == null) {
+            throw new BusinessException(ErrorCode.INVALID_USERNAME_OR_PASSWORD);
+        }
 
         String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getUsername());
         JwtTokenProvider.TokenPair refreshPair =
@@ -78,23 +81,27 @@ public class AuthService {
             throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
-        Long userId = Long.valueOf(claims.getSubject());
+        Long userId;
+        try {
+            userId = Long.valueOf(claims.getSubject());
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
         String jti = claims.getId();
+        String username = claims.get("username", String.class);
 
-        // 校验 Redis 中是否存在该 Refresh Token（未被登出/轮换）
-        if (jti == null || !refreshTokenStore.exists(userId, jti)) {
+        // 原子消费旧 Token：同一枚 Refresh Token 只能轮换一次。
+        if (jti == null || username == null || !refreshTokenStore.consume(userId, jti, username)) {
             log.warn("刷新令牌已被撤销或不存在: userId={}", userId);
             throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
         UserEntity user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        if (user == null || !"active".equals(user.getStatus()) || !username.equals(user.getUsername())) {
+            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
-        // 轮换：删除旧 Refresh Token，签发新的一对
-        refreshTokenStore.delete(userId, jti);
-
+        // 轮换：旧 Refresh Token 已被消费，签发新的一对。
         String accessToken = jwtTokenProvider.generateAccessToken(userId, user.getUsername());
         JwtTokenProvider.TokenPair newRefreshPair =
                 jwtTokenProvider.generateRefreshToken(userId, user.getUsername());

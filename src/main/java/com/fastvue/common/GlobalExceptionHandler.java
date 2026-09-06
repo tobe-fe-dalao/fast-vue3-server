@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -37,6 +38,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException ex) {
         log.warn("登录失败: 用户名或密码错误");
         return build(ErrorCode.INVALID_USERNAME_OR_PASSWORD);
+    }
+
+    /**
+     * 唯一键或外键约束冲突。避免将用户可修正的输入误报为 500。
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("数据约束冲突: {}", ex.getMostSpecificCause().getMessage());
+        return build(ErrorCode.CONFLICT, "数据已存在，或关联的资源不存在");
     }
 
     /**

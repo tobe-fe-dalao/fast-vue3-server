@@ -36,7 +36,12 @@ public enum ErrorCode {
     PERMISSION_DENIED(403, "权限不足"),
 
     // ---- 菜单 ----
-    MENU_NOT_FOUND(404, "菜单不存在");
+    MENU_NOT_FOUND(404, "菜单不存在"),
+
+    // ---- 内容管理 ----
+    ARTICLE_NOT_FOUND(404, "文章不存在"),
+    CATEGORY_NOT_FOUND(404, "分类不存在"),
+    CATEGORY_ALREADY_EXISTS(409, "分类名称或标识已存在");
 
     private final int code;
     private final String message;

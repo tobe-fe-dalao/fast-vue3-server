@@ -87,10 +87,17 @@ public class RoleService {
         }
         roleMapper.updateById(entity);
 
-        if (request.permissionIds() != null || request.menuIds() != null) {
+        if (request.permissionIds() != null) {
             roleMapper.deleteRolePermissions(id);
+            if (!request.permissionIds().isEmpty()) {
+                roleMapper.insertRolePermissions(id, request.permissionIds());
+            }
+        }
+        if (request.menuIds() != null) {
             roleMapper.deleteRoleMenus(id);
-            bindRelations(id, request.permissionIds(), request.menuIds());
+            if (!request.menuIds().isEmpty()) {
+                roleMapper.insertRoleMenus(id, request.menuIds());
+            }
         }
 
         return getById(id);
@@ -123,6 +130,7 @@ public class RoleService {
         return new RoleVO(
                 vo.id(), vo.code(), vo.name(), vo.description(),
                 roleMapper.selectPermissionCodes(entity.getId()),
+                roleMapper.selectMenuIds(entity.getId()),
                 vo.createdAt(), vo.updatedAt());
     }
 

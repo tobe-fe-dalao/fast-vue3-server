@@ -1,6 +1,9 @@
 package com.fastvue.module.auth;
 
 import com.fastvue.common.ApiResponse;
+import com.fastvue.module.user.CreateUserRequest;
+import com.fastvue.module.user.UserService;
+import com.fastvue.module.user.UserVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -21,11 +24,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final UserService userService;
 
     @Operation(summary = "登录")
     @PostMapping("/login")
     public ApiResponse<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.success(authService.login(request));
+    }
+
+    @Operation(summary = "注册")
+    @PostMapping("/register")
+    public ApiResponse<UserVO> register(@Valid @RequestBody RegisterRequest request) {
+        CreateUserRequest createRequest = new CreateUserRequest(
+                request.username(), request.password(), request.username(), request.email(), null);
+        return ApiResponse.success(userService.create(createRequest));
     }
 
     @Operation(summary = "刷新令牌")

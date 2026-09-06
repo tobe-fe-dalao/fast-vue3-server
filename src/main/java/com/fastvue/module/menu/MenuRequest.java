@@ -1,6 +1,7 @@
 package com.fastvue.module.menu;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -30,6 +31,7 @@ public record MenuRequest(
         String permission,
 
         @NotBlank(message = "菜单类型不能为空")
+        @Pattern(regexp = "directory|menu|button", message = "菜单类型只能是 directory、menu 或 button")
         String type) {
 
     public MenuRequest {

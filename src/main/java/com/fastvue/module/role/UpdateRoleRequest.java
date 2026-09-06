@@ -1,6 +1,7 @@
 package com.fastvue.module.role;
 
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Positive;
 
 import java.util.List;
 
@@ -14,7 +15,7 @@ public record UpdateRoleRequest(
         @Size(max = 255, message = "角色描述长度不能超过 255")
         String description,
 
-        List<Long> permissionIds,
+        List<@Positive(message = "权限 ID 必须大于 0") Long> permissionIds,
 
-        List<Long> menuIds) {
+        List<@Positive(message = "菜单 ID 必须大于 0") Long> menuIds) {
 }

@@ -24,6 +24,17 @@ app:
   admin:
     password: ${ADMIN_PASSWORD:}
     default-dev-password: admin123  # 仅供 dev 环境、且未配置 ADMIN_PASSWORD 时使用
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
 
 springdoc:
   swagger-ui:

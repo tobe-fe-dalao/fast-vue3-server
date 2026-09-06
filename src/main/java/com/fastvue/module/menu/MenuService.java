@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -66,6 +67,7 @@ public class MenuService {
      * 创建菜单。
      */
     public MenuVO create(MenuRequest request) {
+        validateParent(null, request.parentId());
         MenuEntity entity = new MenuEntity();
         apply(entity, request);
         menuMapper.insert(entity);
@@ -80,6 +82,7 @@ public class MenuService {
         if (entity == null) {
             throw new BusinessException(ErrorCode.MENU_NOT_FOUND);
         }
+        validateParent(id, request.parentId());
         apply(entity, request);
         menuMapper.updateById(entity);
         return menuConverter.toVO(entity);
@@ -111,6 +114,32 @@ public class MenuService {
         entity.setVisible(request.visible());
         entity.setPermission(request.permission());
         entity.setType(request.type());
+    }
+
+    private void validateParent(Long menuId, Long parentId) {
+        if (parentId == null || parentId == 0L) {
+            return;
+        }
+        if (parentId.equals(menuId)) {
+            throw new BusinessException(ErrorCode.CONFLICT, "菜单不能作为自己的父节点");
+        }
+
+        MenuEntity parent = menuMapper.selectById(parentId);
+        if (parent == null) {
+            throw new BusinessException(ErrorCode.MENU_NOT_FOUND, "父菜单不存在");
+        }
+
+        if (menuId == null) {
+            return;
+        }
+
+        HashSet<Long> visited = new HashSet<>();
+        while (parent != null && parent.getParentId() != null && parent.getParentId() != 0L) {
+            if (!visited.add(parent.getId()) || parent.getParentId().equals(menuId)) {
+                throw new BusinessException(ErrorCode.CONFLICT, "不能将菜单移动到它的子节点下");
+            }
+            parent = menuMapper.selectById(parent.getParentId());
+        }
     }
 
     /**

@@ -39,6 +39,7 @@ services:
       DATABASE_PASSWORD: fastvue3
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+      CORS_ALLOWED_ORIGIN_PATTERNS: ${CORS_ALLOWED_ORIGIN_PATTERNS:-http://localhost:*}
       JWT_SECRET: ${JWT_SECRET:-change-me-to-a-random-secret-at-least-32-bytes-long}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
       SPRING_PROFILES_ACTIVE: dev

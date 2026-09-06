@@ -12,5 +12,6 @@ import static org.mapstruct.MappingConstants.ComponentModel.SPRING;
 public interface RoleConverter {
 
     @Mapping(target = "permissions", ignore = true)
+    @Mapping(target = "menuIds", ignore = true)
     RoleVO toVO(RoleEntity entity);
 }

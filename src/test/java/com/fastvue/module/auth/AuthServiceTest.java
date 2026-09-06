@@ -6,6 +6,7 @@ import com.fastvue.module.user.UserEntity;
 import com.fastvue.module.user.UserMapper;
 import com.fastvue.security.JwtTokenProvider;
 import com.fastvue.security.RefreshTokenStore;
+import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 /**
@@ -95,5 +97,25 @@ class AuthServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_REFRESH_TOKEN);
+    }
+
+    @Test
+    @DisplayName("刷新令牌：禁用用户不能换取新令牌")
+    void refreshDisabledUser() {
+        Claims claims = org.mockito.Mockito.mock(Claims.class);
+        when(jwtTokenProvider.parse("refresh-token")).thenReturn(claims);
+        when(claims.get("type")).thenReturn("refresh");
+        when(claims.getSubject()).thenReturn("1");
+        when(claims.getId()).thenReturn("jti-1");
+        when(claims.get("username", String.class)).thenReturn("admin");
+        when(refreshTokenStore.consume(1L, "jti-1", "admin")).thenReturn(true);
+        admin.setStatus("disabled");
+        when(userMapper.selectById(1L)).thenReturn(admin);
+
+        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest("refresh-token")))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_REFRESH_TOKEN);
+        verify(jwtTokenProvider, never()).generateAccessToken(anyLong(), anyString());
     }
 }

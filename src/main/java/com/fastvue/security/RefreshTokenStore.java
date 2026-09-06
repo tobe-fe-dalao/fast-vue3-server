@@ -27,10 +27,13 @@ public class RefreshTokenStore {
     }
 
     /**
-     * 校验 Refresh Token 是否存在且属于指定用户；存在时返回 true。
+     * 原子消费 Refresh Token。只有 Redis 中存在且用户名一致时才返回 true。
+     *
+     * <p>使用 get-and-delete 避免「先查询、后删除」导致的并发重放窗口。</p>
      */
-    public boolean exists(Long userId, String jti) {
-        return Boolean.TRUE.equals(redisTemplate.hasKey(buildKey(userId, jti)));
+    public boolean consume(Long userId, String jti, String expectedUsername) {
+        String storedUsername = redisTemplate.opsForValue().getAndDelete(buildKey(userId, jti));
+        return expectedUsername.equals(storedUsername);
     }
 
     /**
