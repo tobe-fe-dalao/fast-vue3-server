@@ -1,12 +1,16 @@
 package com.fastvue.module.auth;
 
-import com.fastvue.module.user.CreateUserRequest;
-import com.fastvue.module.user.UserService;
-import com.fastvue.module.user.UserVO;
+import com.fastvue.module.auth.api.AuthController;
+import com.fastvue.module.auth.service.AuthService;
+import com.fastvue.module.user.api.CreateUserRequest;
+import com.fastvue.module.user.service.UserService;
+import com.fastvue.module.user.api.UserVO;
 import com.fastvue.security.JwtAuthenticationFilter;
 import com.fastvue.security.JwtTokenProvider;
 import com.fastvue.security.RefreshTokenStore;
 import com.fastvue.security.SecurityConfig;
+import com.fastvue.module.tenant.service.TenantService;
+import com.fastvue.module.tenant.persistence.TenantMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +45,13 @@ class AuthControllerWebTest {
     private UserService userService;
 
     @MockBean
+    private TenantService tenantService;
+
+    @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private TenantMapper tenantMapper;
 
     @MockBean
     private RefreshTokenStore refreshTokenStore;
@@ -52,6 +62,8 @@ class AuthControllerWebTest {
     @Test
     @DisplayName("未登录用户可以注册")
     void registerIsPublic() throws Exception {
+        when(tenantService.inTenant(any(), any())).thenAnswer(invocation ->
+                ((java.util.function.Supplier<?>) invocation.getArgument(1)).get());
         when(userService.create(any(CreateUserRequest.class))).thenReturn(new UserVO(
                 21L, "new-user", "new-user", "new@example.com", null,
                 "active", List.of(), OffsetDateTime.now(), OffsetDateTime.now()));

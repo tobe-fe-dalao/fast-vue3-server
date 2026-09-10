@@ -1,8 +1,8 @@
 package com.fastvue.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fastvue.common.ApiResponse;
-import com.fastvue.common.ErrorCode;
+import com.fastvue.common.response.ApiResponse;
+import com.fastvue.common.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -46,8 +46,10 @@ public class SecurityConfig {
             "/api/v1/auth/register",
             "/api/v1/auth/refresh",
             "/v3/api-docs/**",
+            "/api-docs-ui/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
+            "/swagger-ui-default.html",
             "/actuator/health",
     };
 

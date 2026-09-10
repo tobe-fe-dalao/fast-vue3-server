@@ -1,5 +1,7 @@
 package com.fastvue.module.portal;
 
+import com.fastvue.module.portal.api.PortalController;
+import com.fastvue.module.tenant.persistence.TenantMapper;
 import com.fastvue.security.JwtAuthenticationFilter;
 import com.fastvue.security.JwtTokenProvider;
 import com.fastvue.security.RefreshTokenStore;
@@ -28,6 +30,9 @@ class PortalControllerWebTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private TenantMapper tenantMapper;
 
     @MockBean
     private RefreshTokenStore refreshTokenStore;

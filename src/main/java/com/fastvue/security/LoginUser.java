@@ -13,11 +13,20 @@ import java.util.List;
  */
 public record LoginUser(
         Long id,
+        Long tenantId,
         String username,
         String password,
         boolean enabled,
         List<String> roles,
+        List<String> permissions,
         Collection<? extends GrantedAuthority> authorities) implements UserDetails {
+
+    public LoginUser(Long id, Long tenantId, String username, String password, boolean enabled,
+                     List<String> roles, Collection<? extends GrantedAuthority> authorities) {
+        this(id, tenantId, username, password, enabled, roles,
+                authorities.stream().map(GrantedAuthority::getAuthority)
+                        .filter(value -> !value.startsWith("ROLE_")).toList(), authorities);
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

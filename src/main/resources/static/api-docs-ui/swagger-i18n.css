@@ -1,0 +1,142 @@
+:root {
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #172033;
+  background: #f7f9fc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f7f9fc;
+}
+
+.docs-header {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 72px;
+  padding: 12px clamp(18px, 4vw, 56px);
+  color: #fff;
+  background: linear-gradient(120deg, #111827, #24334e);
+  box-shadow: 0 4px 18px rgb(15 23 42 / 20%);
+}
+
+.docs-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.docs-brand strong {
+  font-size: 20px;
+  letter-spacing: .01em;
+}
+
+.docs-brand span {
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+.docs-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.docs-actions select,
+.json-link {
+  min-height: 36px;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 8px;
+  color: #fff;
+  background: rgb(255 255 255 / 10%);
+}
+
+.docs-actions select {
+  padding: 0 32px 0 12px;
+  cursor: pointer;
+}
+
+.docs-actions select option {
+  color: #172033;
+}
+
+.json-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 13px;
+  text-decoration: none;
+}
+
+.docs-actions select:hover,
+.json-link:hover {
+  background: rgb(255 255 255 / 18%);
+}
+
+.docs-notice {
+  max-width: 1460px;
+  margin: 18px auto 0;
+  padding: 11px 18px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  color: #1e3a8a;
+  background: #eff6ff;
+  font-size: 14px;
+}
+
+#swagger-ui {
+  padding-bottom: 40px;
+}
+
+.swagger-ui .topbar {
+  display: none;
+}
+
+.swagger-ui .information-container.wrapper,
+.swagger-ui .wrapper {
+  max-width: 1460px;
+}
+
+.swagger-ui .info {
+  margin: 28px 0 22px;
+}
+
+.swagger-ui .scheme-container {
+  margin: 0 0 22px;
+  padding: 18px 0;
+  background: #fff;
+  box-shadow: 0 2px 12px rgb(15 23 42 / 8%);
+}
+
+@media (max-width: 760px) {
+  .docs-header,
+  .docs-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .docs-header {
+    position: static;
+    gap: 12px;
+  }
+
+  .docs-actions {
+    gap: 8px;
+  }
+
+  .docs-actions label {
+    display: none;
+  }
+
+  .docs-notice {
+    margin: 12px 12px 0;
+  }
+}

@@ -1,6 +1,10 @@
 package com.fastvue.module.user;
 
-import com.fastvue.common.GlobalExceptionHandler;
+import com.fastvue.common.exception.GlobalExceptionHandler;
+import com.fastvue.module.user.api.UserController;
+import com.fastvue.module.tenant.persistence.TenantMapper;
+import com.fastvue.module.user.api.UserVO;
+import com.fastvue.module.user.service.UserService;
 import com.fastvue.security.JwtAuthenticationFilter;
 import com.fastvue.security.JwtTokenProvider;
 import com.fastvue.security.RefreshTokenStore;
@@ -42,6 +46,9 @@ class UserControllerPermissionTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private TenantMapper tenantMapper;
 
     @MockBean
     private RefreshTokenStore refreshTokenStore;

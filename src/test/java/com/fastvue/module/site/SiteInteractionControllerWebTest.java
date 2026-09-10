@@ -1,5 +1,10 @@
 package com.fastvue.module.site;
 
+import com.fastvue.module.site.api.BlogCommentVO;
+import com.fastvue.module.site.api.PaymentOrderVO;
+import com.fastvue.module.site.api.SiteInteractionController;
+import com.fastvue.module.site.service.SiteInteractionService;
+import com.fastvue.module.tenant.persistence.TenantMapper;
 import com.fastvue.security.JwtAuthenticationFilter;
 import com.fastvue.security.JwtTokenProvider;
 import com.fastvue.security.SecurityConfig;
@@ -36,6 +41,9 @@ class SiteInteractionControllerWebTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private TenantMapper tenantMapper;
 
     @MockBean
     private UserDetailsService userDetailsService;

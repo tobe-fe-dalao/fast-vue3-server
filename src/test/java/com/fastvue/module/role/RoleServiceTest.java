@@ -1,5 +1,11 @@
 package com.fastvue.module.role;
 
+import com.fastvue.module.role.api.RoleVO;
+import com.fastvue.module.role.api.UpdateRoleRequest;
+import com.fastvue.module.role.persistence.RoleEntity;
+import com.fastvue.module.role.persistence.RoleMapper;
+import com.fastvue.module.role.service.RoleConverter;
+import com.fastvue.module.role.service.RoleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,7 +51,7 @@ class RoleServiceTest {
         roleService.update(2L, new UpdateRoleRequest(null, null, List.of(1L), null));
 
         verify(roleMapper).deleteRolePermissions(2L);
-        verify(roleMapper).insertRolePermissions(2L, List.of(1L));
+        verify(roleMapper).insertRolePermissions(null, 2L, List.of(1L));
         verify(roleMapper, never()).deleteRoleMenus(2L);
     }
 
@@ -55,7 +61,7 @@ class RoleServiceTest {
         roleService.update(2L, new UpdateRoleRequest(null, null, null, List.of(1L)));
 
         verify(roleMapper).deleteRoleMenus(2L);
-        verify(roleMapper).insertRoleMenus(2L, List.of(1L));
+        verify(roleMapper).insertRoleMenus(null, 2L, List.of(1L));
         verify(roleMapper, never()).deleteRolePermissions(2L);
     }
 }

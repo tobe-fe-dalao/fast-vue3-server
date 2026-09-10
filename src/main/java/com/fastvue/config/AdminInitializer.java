@@ -1,7 +1,7 @@
 package com.fastvue.config;
 
-import com.fastvue.module.user.UserEntity;
-import com.fastvue.module.user.UserMapper;
+import com.fastvue.module.user.persistence.UserEntity;
+import com.fastvue.module.user.persistence.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
+import com.fastvue.infrastructure.tenant.TenantContext;
 
 /**
  * 默认管理员密码初始化。
@@ -45,16 +46,21 @@ public class AdminInitializer implements ApplicationRunner {
             return;
         }
 
-        UserEntity admin = userMapper.selectOne(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<UserEntity>()
-                        .eq(UserEntity::getUsername, "admin"));
-        if (admin == null) {
+        boolean updated = TenantContext.runAs(1L, false, () -> {
+            UserEntity admin = userMapper.selectOne(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<UserEntity>()
+                            .eq(UserEntity::getUsername, "admin"));
+            if (admin == null) {
+                return false;
+            }
+            admin.setPassword(passwordEncoder.encode(configured));
+            userMapper.updateById(admin);
+            return true;
+        });
+        if (!updated) {
             log.warn("未找到 admin 用户，跳过密码初始化");
             return;
         }
-
-        admin.setPassword(passwordEncoder.encode(configured));
-        userMapper.updateById(admin);
         log.info("admin 用户密码已按配置初始化（明文来源：{}）",
                 adminPassword == null || adminPassword.isBlank() ? "dev 默认值" : "ADMIN_PASSWORD 环境变量");
     }

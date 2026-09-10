@@ -5,6 +5,10 @@ spring:
     active: dev
   jackson:
     default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 mybatis-plus:
   configuration:
@@ -26,19 +30,39 @@ app:
     default-dev-password: admin123  # 仅供 dev 环境、且未配置 ADMIN_PASSWORD 时使用
   cors:
     allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*}
+  storage:
+    local-root: ${FILE_STORAGE_ROOT:${java.io.tmpdir}/fast-vue3-server/uploads}
+    public-base-url: ${FILE_PUBLIC_BASE_URL:/api/v1/files}
+    max-size-bytes: ${FILE_MAX_SIZE_BYTES:10485760}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus,metrics
   endpoint:
     health:
       show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  pattern:
+    level: "%5p [requestId:%X{requestId:-} tenantId:%X{tenantId:-} userId:%X{userId:-}]"
 
 springdoc:
   swagger-ui:
-    path: /swagger-ui.html
+    # The public /swagger-ui.html route is handled by our localized page.
+    # Keep Springdoc's generated page on an internal fallback URL so its
+    # bundled Swagger UI assets remain available without an external CDN.
+    path: /swagger-ui-default.html
     persist-authorization: true
+    urls-primary-name: 中文
+    doc-expansion: none
+    display-request-duration: true
+    filter: true
+    tags-sorter: alpha
+    operations-sorter: method
   api-docs:
     path: /v3/api-docs

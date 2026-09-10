@@ -16,6 +16,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import com.fastvue.infrastructure.tenant.TenantContext;
+import com.fastvue.module.tenant.persistence.TenantEntity;
+import com.fastvue.module.tenant.persistence.TenantMapper;
+
+import java.time.OffsetDateTime;
 
 /**
  * JWT 认证过滤器。
@@ -29,6 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserDetailsService userDetailsService;
+    private final TenantMapper tenantMapper;
 
     @Override
     protected void doFilterInternal(
@@ -36,6 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
 
+        TenantContext.clear();
         String header = request.getHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
@@ -51,20 +58,53 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
+            Long tenantId = claims.get("tenantId", Long.class);
+            if (tenantId == null) {
+                tenantId = 1L;
+            }
+            TenantEntity tenant = tenantMapper.selectById(tenantId);
+            if (tenant == null || !"active".equals(tenant.getStatus())
+                    || tenant.getExpiredAt() != null && tenant.getExpiredAt().isBefore(OffsetDateTime.now())) {
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
+            }
             String username = claims.get("username", String.class);
+            TenantContext.set(tenantId, false);
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                if (!userDetails.isEnabled() || userDetails instanceof LoginUser loginUser
+                        && (!tenantId.equals(loginUser.tenantId())
+                        || !String.valueOf(loginUser.id()).equals(claims.getSubject()))) {
+                    SecurityContextHolder.clearContext();
+                    TenantContext.clear();
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                boolean superAdmin = userDetails instanceof LoginUser loginUser
+                        && loginUser.id().equals(1L)
+                        && loginUser.tenantId().equals(1L)
+                        && loginUser.roles().contains("admin");
+                TenantContext.set(tenantId, superAdmin);
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
                                 userDetails, null, userDetails.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+                request.setAttribute("requestTenantId", tenantId);
+                if (userDetails instanceof LoginUser loginUser) {
+                    request.setAttribute("requestUserId", loginUser.id());
+                }
             }
-        } catch (JwtException | IllegalArgumentException ex) {
+        } catch (JwtException | IllegalArgumentException | org.springframework.security.core.AuthenticationException ex) {
             // Token 无效或过期：不设置认证信息，由后续 EntryPoint 返回 401
             SecurityContextHolder.clearContext();
         }
 
-        filterChain.doFilter(request, response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            TenantContext.clear();
+        }
     }
 }

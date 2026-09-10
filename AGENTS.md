@@ -4,11 +4,12 @@ This repository is the Java 21 Spring Boot reference backend for Fast Vue3. It e
 
 ## Repository Shape
 
-- `src/main/java/com/fastvue/common`: response envelopes, errors, and global exception handling.
+- `src/main/java/com/fastvue/common/response`: response envelopes and pagination models.
+- `src/main/java/com/fastvue/common/exception`: errors and global exception handling.
 - `src/main/java/com/fastvue/config`: persistence, OpenAPI, serialization, and application configuration.
-- `src/main/java/com/fastvue/infrastructure`: shared persistence infrastructure and audit fields.
+- `src/main/java/com/fastvue/infrastructure/persistence`: shared persistence infrastructure and audit fields.
 - `src/main/java/com/fastvue/security`: JWT authentication, Spring Security, current-user access, and refresh-token storage.
-- `src/main/java/com/fastvue/module`: business modules organized vertically by capability, including auth, users, roles, permissions, menus, content, analytics, portal, and site interactions.
+- `src/main/java/com/fastvue/module`: business modules organized vertically by capability. Each module uses `api`, `service`, and `persistence` subpackages as needed.
 - `src/main/resources/db/migration`: append-only Flyway migrations.
 - `src/test`: unit, MockMvc, security, and integration tests.
 

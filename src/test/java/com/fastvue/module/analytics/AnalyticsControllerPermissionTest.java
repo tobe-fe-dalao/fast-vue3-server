@@ -1,6 +1,9 @@
 package com.fastvue.module.analytics;
 
-import com.fastvue.common.GlobalExceptionHandler;
+import com.fastvue.common.exception.GlobalExceptionHandler;
+import com.fastvue.module.analytics.api.AnalyticsController;
+import com.fastvue.module.analytics.api.DataController;
+import com.fastvue.module.tenant.persistence.TenantMapper;
 import com.fastvue.security.JwtAuthenticationFilter;
 import com.fastvue.security.JwtTokenProvider;
 import com.fastvue.security.SecurityConfig;
@@ -28,6 +31,9 @@ class AnalyticsControllerPermissionTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private TenantMapper tenantMapper;
 
     @MockBean
     private UserDetailsService userDetailsService;

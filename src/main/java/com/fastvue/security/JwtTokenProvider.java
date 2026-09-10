@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
+import com.fastvue.infrastructure.tenant.TenantContext;
 
 /**
  * JWT 生成与解析工具。
@@ -57,6 +58,7 @@ public class JwtTokenProvider {
         var builder = Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("username", username)
+                .claim("tenantId", TenantContext.tenantId())
                 .claim("type", type)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(ttlSeconds)));

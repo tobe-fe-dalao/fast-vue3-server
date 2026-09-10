@@ -1,8 +1,8 @@
 package com.fastvue.security;
 
-import com.fastvue.module.role.RoleMapper;
-import com.fastvue.module.user.UserEntity;
-import com.fastvue.module.user.UserMapper;
+import com.fastvue.module.role.persistence.RoleMapper;
+import com.fastvue.module.user.persistence.UserEntity;
+import com.fastvue.module.user.persistence.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -25,6 +25,7 @@ public class DbUserDetailsService implements UserDetailsService {
 
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
+    private final PermissionCache permissionCache;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
@@ -35,8 +36,11 @@ public class DbUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("用户不存在: " + username);
         }
 
-        List<String> roleCodes = userMapper.selectRoleCodes(user.getId());
-        List<String> permissionCodes = userMapper.selectPermissionCodes(user.getId());
+        PermissionCache.Snapshot snapshot = permissionCache.get(user.getId(), () ->
+                new PermissionCache.Snapshot(userMapper.selectRoleCodes(user.getId()),
+                        userMapper.selectPermissionCodes(user.getId())));
+        List<String> roleCodes = snapshot.roles();
+        List<String> permissionCodes = snapshot.permissions();
 
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
         roleCodes.forEach(code -> authorities.add(new SimpleGrantedAuthority("ROLE_" + code)));
@@ -44,10 +48,12 @@ public class DbUserDetailsService implements UserDetailsService {
 
         return new LoginUser(
                 user.getId(),
+                user.getTenantId(),
                 user.getUsername(),
                 user.getPassword(),
                 "active".equals(user.getStatus()),
                 roleCodes,
+                permissionCodes,
                 authorities);
     }
 }

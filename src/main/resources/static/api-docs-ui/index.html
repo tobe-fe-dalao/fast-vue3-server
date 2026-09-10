@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Fast Vue3 API 文档</title>
+  <link rel="icon" type="image/png" href="/swagger-ui/favicon-32x32.png">
+  <link rel="stylesheet" href="/swagger-ui/swagger-ui.css">
+  <link rel="stylesheet" href="/api-docs-ui/swagger-i18n.css">
+</head>
+<body>
+  <header class="docs-header">
+    <div class="docs-brand">
+      <strong data-i18n="pageTitle">Fast Vue3 API 文档</strong>
+      <span data-i18n="pageSubtitle">接口说明、在线调试与数据模型</span>
+    </div>
+    <div class="docs-actions">
+      <label for="language-select" data-i18n="language">页面语言</label>
+      <select id="language-select" aria-label="页面语言">
+        <option value="zh-CN">中文</option>
+        <option value="ja-JP">日本語</option>
+        <option value="en-US">English</option>
+      </select>
+      <a id="openapi-json-link" class="json-link" href="/v3/api-docs/zh-CN" target="_blank" rel="noreferrer"
+         data-i18n="openJson">查看 OpenAPI JSON</a>
+    </div>
+  </header>
+  <div class="docs-notice" data-i18n="authHint">
+    公开接口可直接调用；其他接口请先登录，再点击“授权”填入 Bearer Token。
+  </div>
+  <main id="swagger-ui" aria-live="polite"></main>
+  <noscript>此页面需要启用 JavaScript。</noscript>
+
+  <script src="/swagger-ui/swagger-ui-bundle.js"></script>
+  <script src="/api-docs-ui/swagger-i18n.js"></script>
+</body>
+</html>

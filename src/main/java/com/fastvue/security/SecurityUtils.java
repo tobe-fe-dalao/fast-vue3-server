@@ -39,11 +39,19 @@ public final class SecurityUtils {
      * 获取当前登录用户；未登录时抛出 {@link IllegalArgumentException}。
      */
     public static LoginUser currentUser() {
-        Object principal = currentPrincipal();
-        if (principal instanceof LoginUser loginUser) {
-            return loginUser;
-        }
+        LoginUser loginUser = currentUserOrNull();
+        if (loginUser != null) return loginUser;
         throw new IllegalStateException("当前未登录");
+    }
+
+    public static LoginUser currentUserOrNull() {
+        Object principal = currentPrincipal();
+        return principal instanceof LoginUser loginUser ? loginUser : null;
+    }
+
+    public static Long currentTenantId() {
+        LoginUser user = currentUser();
+        return user.tenantId();
     }
 
     private static Object currentPrincipal() {

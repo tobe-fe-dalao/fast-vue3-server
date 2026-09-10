@@ -1,11 +1,17 @@
 package com.fastvue.module.auth;
 
-import com.fastvue.common.BusinessException;
-import com.fastvue.common.ErrorCode;
-import com.fastvue.module.user.UserEntity;
-import com.fastvue.module.user.UserMapper;
+import com.fastvue.common.exception.BusinessException;
+import com.fastvue.common.exception.ErrorCode;
+import com.fastvue.module.auth.api.LoginRequest;
+import com.fastvue.module.auth.api.RefreshTokenRequest;
+import com.fastvue.module.auth.api.TokenResponse;
+import com.fastvue.module.auth.service.AuthService;
+import com.fastvue.module.user.persistence.UserEntity;
+import com.fastvue.module.user.persistence.UserMapper;
 import com.fastvue.security.JwtTokenProvider;
 import com.fastvue.security.RefreshTokenStore;
+import com.fastvue.module.tenant.service.TenantService;
+import com.fastvue.module.tenant.persistence.TenantEntity;
 import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,6 +49,8 @@ class AuthServiceTest {
     private RefreshTokenStore refreshTokenStore;
     @Mock
     private UserMapper userMapper;
+    @Mock
+    private TenantService tenantService;
 
     @InjectMocks
     private AuthService authService;
@@ -60,6 +68,9 @@ class AuthServiceTest {
     @Test
     @DisplayName("登录成功：签发 Access + Refresh Token")
     void loginSuccess() {
+        TenantEntity tenant = new TenantEntity();
+        tenant.setId(1L);
+        when(tenantService.requireActive("default")).thenReturn(tenant);
         when(userMapper.selectOne(any())).thenReturn(admin);
         when(jwtTokenProvider.generateAccessToken(1L, "admin")).thenReturn("access-token");
         when(jwtTokenProvider.generateRefreshToken(1L, "admin"))
@@ -78,6 +89,9 @@ class AuthServiceTest {
     @Test
     @DisplayName("登录失败：用户名或密码错误")
     void loginFailure() {
+        TenantEntity tenant = new TenantEntity();
+        tenant.setId(1L);
+        when(tenantService.requireActive("default")).thenReturn(tenant);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenThrow(new BadCredentialsException("bad credentials"));
 
