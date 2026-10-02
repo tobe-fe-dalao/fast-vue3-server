@@ -54,7 +54,8 @@ public class UserController {
     @Operation(summary = "更新用户")
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('user:update')")
-    public ApiResponse<UserVO> update(@PathVariable Long id, @Valid @RequestBody UpdateUserRequest request) {
+    public ApiResponse<UserVO> update(
+            @PathVariable Long id, @Valid @RequestBody UpdateUserRequest request) {
         return ApiResponse.success(userService.update(id, request));
     }
 

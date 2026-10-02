@@ -1,5 +1,9 @@
 package com.fastvue.module.demo;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.fastvue.module.demo.api.DemoDataController;
 import com.fastvue.module.tenant.persistence.TenantMapper;
 import com.fastvue.security.JwtAuthenticationFilter;
@@ -10,35 +14,26 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** 管理端聚合数据接口的安全与分页契约测试。 */
 @WebMvcTest(DemoDataController.class)
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class})
-class DemoDataControllerWebTest {
+class DemoDataControllerWebTest extends com.fastvue.security.SecurityMvcTestSupport {
 
-    @Autowired
-    private MockMvc mockMvc;
+    @Autowired private MockMvc mockMvc;
 
-    @MockBean
-    private JwtTokenProvider jwtTokenProvider;
+    @MockitoBean private JwtTokenProvider jwtTokenProvider;
 
-    @MockBean
-    private TenantMapper tenantMapper;
+    @MockitoBean private TenantMapper tenantMapper;
 
-    @MockBean
-    private RefreshTokenStore refreshTokenStore;
+    @MockitoBean private RefreshTokenStore refreshTokenStore;
 
-    @MockBean
-    private UserDetailsService userDetailsService;
+    @MockitoBean private UserDetailsService userDetailsService;
 
     @Test
     @DisplayName("管理端演示接口未登录返回 401")
@@ -52,9 +47,10 @@ class DemoDataControllerWebTest {
     @DisplayName("已登录可读取分页登录日志")
     @WithMockUser
     void loginLogHasCanonicalPageShape() throws Exception {
-        mockMvc.perform(get("/api/v1/log/login")
-                        .queryParam("page", "2")
-                        .queryParam("pageSize", "5"))
+        mockMvc.perform(
+                        get("/api/v1/log/login")
+                                .queryParam("page", "2")
+                                .queryParam("pageSize", "5"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.items.length()").value(5))

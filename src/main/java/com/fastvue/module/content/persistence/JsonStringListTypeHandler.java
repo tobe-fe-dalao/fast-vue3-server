@@ -2,15 +2,14 @@ package com.fastvue.module.content.persistence;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.ibatis.type.BaseTypeHandler;
-import org.apache.ibatis.type.JdbcType;
-
 import java.sql.CallableStatement;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.ibatis.type.BaseTypeHandler;
+import org.apache.ibatis.type.JdbcType;
 
 /**
  * 将 {@code List<String>} 以 JSON 文本形式存取的关系映射处理器。
@@ -24,7 +23,9 @@ public class JsonStringListTypeHandler extends BaseTypeHandler<List<String>> {
     private static final TypeReference<List<String>> TYPE_REF = new TypeReference<>() {};
 
     @Override
-    public void setNonNullParameter(PreparedStatement ps, int i, List<String> parameter, JdbcType jdbcType) throws SQLException {
+    public void setNonNullParameter(
+            PreparedStatement ps, int i, List<String> parameter, JdbcType jdbcType)
+            throws SQLException {
         try {
             ps.setString(i, MAPPER.writeValueAsString(parameter));
         } catch (Exception e) {
@@ -43,7 +44,8 @@ public class JsonStringListTypeHandler extends BaseTypeHandler<List<String>> {
     }
 
     @Override
-    public List<String> getNullableResult(CallableStatement cs, int columnIndex) throws SQLException {
+    public List<String> getNullableResult(CallableStatement cs, int columnIndex)
+            throws SQLException {
         return parse(cs.getString(columnIndex));
     }
 
@@ -52,7 +54,8 @@ public class JsonStringListTypeHandler extends BaseTypeHandler<List<String>> {
             return new ArrayList<>();
         }
         try {
-            return MAPPER.readValue(value, TYPE_REF);
+            List<String> parsed = MAPPER.readValue(value, TYPE_REF);
+            return parsed == null ? new ArrayList<>() : parsed;
         } catch (Exception e) {
             throw new SQLException("解析字符串列表失败", e);
         }

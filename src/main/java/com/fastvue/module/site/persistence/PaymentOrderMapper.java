@@ -5,5 +5,4 @@ import org.apache.ibatis.annotations.Mapper;
 
 /** Payment order data access. */
 @Mapper
-public interface PaymentOrderMapper extends BaseMapper<PaymentOrderEntity> {
-}
+public interface PaymentOrderMapper extends BaseMapper<PaymentOrderEntity> {}

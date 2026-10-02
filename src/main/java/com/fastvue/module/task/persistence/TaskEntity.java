@@ -3,10 +3,9 @@ package com.fastvue.module.task.persistence;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.Version;
 import com.fastvue.infrastructure.persistence.BaseEntity;
+import java.time.LocalDate;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -21,6 +20,5 @@ public class TaskEntity extends BaseEntity {
     private String priority;
     private String status;
     private LocalDate dueDate;
-    @Version
-    private Integer version;
+    @Version private Integer version;
 }

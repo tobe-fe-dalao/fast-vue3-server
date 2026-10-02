@@ -1,10 +1,10 @@
 package com.fastvue.module.tenant.api;
 
+import com.fastvue.common.validation.BcryptPassword;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-
 import java.time.OffsetDateTime;
 
 public final class TenantModels {
@@ -16,7 +16,7 @@ public final class TenantModels {
             @NotBlank @Size(max = 32) String plan,
             OffsetDateTime expiredAt,
             @NotBlank @Size(max = 64) String adminUsername,
-            @NotBlank @Size(min = 10, max = 100) String adminPassword,
+            @BcryptPassword @NotBlank @Size(min = 10, max = 72) String adminPassword,
             @NotBlank @Email @Size(max = 128) String adminEmail) {}
 
     public record UpdateRequest(

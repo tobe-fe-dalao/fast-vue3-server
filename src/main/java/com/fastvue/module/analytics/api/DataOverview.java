@@ -7,15 +7,11 @@ import java.util.List;
  *
  * <p>对应前端契约 {@code DataOverview}：stats / recent。</p>
  */
-public record DataOverview(
-        List<Recent> recent,
-        List<Stat> stats) {
+public record DataOverview(List<Recent> recent, List<Stat> stats) {
 
     /** 统计指标卡片 */
-    public record Stat(String border, String prefix, String suffix, String title, Object value) {
-    }
+    public record Stat(String border, String prefix, String suffix, String title, Object value) {}
 
     /** 最近交易流水 */
-    public record Recent(String date, String type, String amount, String status) {
-    }
+    public record Recent(String date, String type, String amount, String status) {}
 }

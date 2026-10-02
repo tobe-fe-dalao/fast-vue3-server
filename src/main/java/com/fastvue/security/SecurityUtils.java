@@ -10,8 +10,7 @@ import org.springframework.security.core.userdetails.UserDetails;
  */
 public final class SecurityUtils {
 
-    private SecurityUtils() {
-    }
+    private SecurityUtils() {}
 
     /**
      * 获取当前登录用户 id；未登录时返回 null。

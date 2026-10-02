@@ -3,17 +3,16 @@ package com.fastvue.module.content.persistence;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fastvue.infrastructure.persistence.BaseEntity;
+import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.util.List;
 
 /**
  * 内容文章实体。
  */
 @Getter
 @Setter
-@TableName("content_article")
+@TableName(value = "content_article", autoResultMap = true)
 public class ArticleEntity extends BaseEntity {
 
     private Long tenantId;

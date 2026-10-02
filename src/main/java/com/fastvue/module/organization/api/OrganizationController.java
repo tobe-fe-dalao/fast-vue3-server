@@ -21,8 +21,8 @@ public class OrganizationController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('department:manage')")
-    public ApiResponse<OrganizationModels.OrganizationVO> update(@PathVariable Long id,
-            @Valid @RequestBody OrganizationModels.UpdateRequest request) {
+    public ApiResponse<OrganizationModels.OrganizationVO> update(
+            @PathVariable Long id, @Valid @RequestBody OrganizationModels.UpdateRequest request) {
         return ApiResponse.success(service.update(id, request));
     }
 }

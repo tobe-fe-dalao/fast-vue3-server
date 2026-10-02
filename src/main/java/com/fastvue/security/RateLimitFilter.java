@@ -3,51 +3,77 @@ package com.fastvue.security;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fastvue.common.exception.ErrorCode;
 import com.fastvue.common.response.ApiResponse;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+import java.io.IOException;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.http.MediaType;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-
-import java.io.IOException;
-import java.time.Duration;
 
 @Slf4j
-@Component
-@ConditionalOnBean(StringRedisTemplate.class)
-@Order(Ordered.HIGHEST_PRECEDENCE + 20)
 @RequiredArgsConstructor
 public class RateLimitFilter extends OncePerRequestFilter {
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
+    private static final DefaultRedisScript<Long> COUNT =
+            new DefaultRedisScript<>(
+                    """
+            local count = redis.call('INCR', KEYS[1])
+            if count == 1 or redis.call('TTL', KEYS[1]) < 0 then redis.call('EXPIRE', KEYS[1], 60) end
+            return count
+            """,
+                    Long.class);
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+    protected void doFilterInternal(
+            HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        int limit = request.getRequestURI().equals("/api/v1/auth/login") ? 10 : 120;
-        if ("GET".equals(request.getMethod()) || "OPTIONS".equals(request.getMethod())) {
-            chain.doFilter(request, response); return;
+        String path = request.getRequestURI();
+        if (!path.startsWith("/api/v1/") || "OPTIONS".equals(request.getMethod())) {
+            chain.doFilter(request, response);
+            return;
         }
-        String key = "rate:" + request.getRemoteAddr() + ":" + request.getRequestURI();
+        String bucket =
+                path.equals("/api/v1/auth/login")
+                        ? "login"
+                        : path.equals("/api/v1/auth/register")
+                                ? "register"
+                                : path.equals("/api/v1/auth/refresh")
+                                        ? "refresh"
+                                        : path.startsWith("/api/v1/public/") ? "public" : "api";
+        int limit =
+                switch (bucket) {
+                    case "login" -> 10;
+                    case "register" -> 5;
+                    case "refresh" -> 30;
+                    case "public" -> 120;
+                    default -> 300;
+                };
+        Long count;
         try {
-            Long count = redis.opsForValue().increment(key);
-            if (count != null && count == 1) redis.expire(key, Duration.ofMinutes(1));
-            if (count != null && count > limit) {
-                response.setStatus(429); response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                objectMapper.writeValue(response.getWriter(), ApiResponse.error(ErrorCode.RATE_LIMITED));
-                return;
-            }
-        } catch (Exception ex) {
-            log.warn("限流存储不可用，当前请求降级放行: {}", ex.getMessage());
+            count = redis.execute(COUNT, List.of("rate:" + bucket + ":" + request.getRemoteAddr()));
+            if (count == null) throw new IllegalStateException("No rate-limit result");
+        } catch (RuntimeException ex) {
+            log.warn("Rate limiter unavailable ({})", ex.getClass().getSimpleName());
+            write(response, ErrorCode.SERVICE_UNAVAILABLE);
+            return;
+        }
+        if (count > limit) {
+            write(response, ErrorCode.RATE_LIMITED);
+            return;
         }
         chain.doFilter(request, response);
+    }
+
+    private void write(HttpServletResponse response, ErrorCode error) throws IOException {
+        response.setStatus(error.code());
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setHeader("Retry-After", "60");
+        objectMapper.writeValue(response.getWriter(), ApiResponse.error(error));
     }
 }

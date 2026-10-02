@@ -1,0 +1,56 @@
+name: Verify
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - run: docker info
+      - run: ./mvnw -B -ntp clean verify
+      - name: Require integration tests to execute
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          paths = glob.glob('target/failsafe-reports/TEST-*IntegrationTest.xml')
+          sources = glob.glob('src/test/java/**/*IntegrationTest.java', recursive=True)
+          assert sources and len(paths) == len(sources), 'Missing integration test reports'
+          for path in paths:
+              root = ET.parse(path).getroot()
+              assert int(root.attrib['tests']) > 0 and int(root.attrib.get('skipped', 0)) == 0, path
+          PY
+      - name: Check all resolved runtime dependencies
+        run: |
+          ./mvnw -B -ntp dependency:list -DincludeScope=runtime -DoutputFile=target/runtime-dependencies.txt
+          python3 scripts/check-runtime-dependencies.py
+      - run: docker build -t fastvue3:verify .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: |
+            target/checkstyle-result.xml
+            target/pmd.xml
+            target/spotbugsXml.xml
+            target/reports/pmd.html
+            target/surefire-reports
+            target/failsafe-reports
+            target/site/jacoco
+            target/dependency-security.json
+  dependencies:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high

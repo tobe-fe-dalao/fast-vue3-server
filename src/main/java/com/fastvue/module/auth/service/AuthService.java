@@ -2,30 +2,29 @@ package com.fastvue.module.auth.service;
 
 import com.fastvue.common.exception.BusinessException;
 import com.fastvue.common.exception.ErrorCode;
+import com.fastvue.infrastructure.tenant.TenantContext;
 import com.fastvue.module.auth.api.LoginRequest;
 import com.fastvue.module.auth.api.MeResponse;
 import com.fastvue.module.auth.api.RefreshTokenRequest;
 import com.fastvue.module.auth.api.TokenResponse;
+import com.fastvue.module.tenant.persistence.TenantEntity;
+import com.fastvue.module.tenant.service.TenantService;
 import com.fastvue.module.user.persistence.UserEntity;
 import com.fastvue.module.user.persistence.UserMapper;
 import com.fastvue.security.JwtTokenProvider;
 import com.fastvue.security.LoginUser;
 import com.fastvue.security.RefreshTokenStore;
 import com.fastvue.security.SecurityUtils;
-import com.fastvue.infrastructure.tenant.TenantContext;
-import com.fastvue.module.tenant.persistence.TenantEntity;
-import com.fastvue.module.tenant.service.TenantService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
+import java.time.Duration;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
-
-import java.time.Duration;
-import java.util.List;
 
 /**
  * 认证业务逻辑。
@@ -52,15 +51,26 @@ public class AuthService {
     private TokenResponse doLogin(LoginRequest request) {
         try {
             authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.username(), request.password()));
-        } catch (AuthenticationException ex) {
-            log.warn("登录失败: 用户名 {} 凭证无效或账号不可用", request.username());
+                    new UsernamePasswordAuthenticationToken(
+                            request.username(), request.password()));
+        } catch (org.springframework.security.authentication.AuthenticationServiceException ex) {
+            log.error("Authentication service unavailable ({})", ex.getClass().getSimpleName());
+            throw new BusinessException(ErrorCode.SERVICE_UNAVAILABLE);
+        } catch (org.springframework.security.authentication.BadCredentialsException
+                | org.springframework.security.authentication.AccountStatusException
+                | org.springframework.security.core.userdetails.UsernameNotFoundException ex) {
+            log.warn("登录失败: 凭证无效或账号不可用");
             throw new BusinessException(ErrorCode.INVALID_USERNAME_OR_PASSWORD);
+        } catch (AuthenticationException ex) {
+            log.error("Unexpected authentication failure ({})", ex.getClass().getSimpleName());
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        UserEntity user = userMapper.selectOne(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<UserEntity>()
-                        .eq(UserEntity::getUsername, request.username()));
+        UserEntity user =
+                userMapper.selectOne(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                                        UserEntity>()
+                                .eq(UserEntity::getUsername, request.username()));
         if (user == null) {
             throw new BusinessException(ErrorCode.INVALID_USERNAME_OR_PASSWORD);
         }
@@ -75,8 +85,9 @@ public class AuthService {
                 user.getUsername(),
                 Duration.ofSeconds(jwtTokenProvider.refreshTokenTtlSeconds()));
 
-        log.info("用户 {} 登录成功", user.getUsername());
-        return new TokenResponse(accessToken, refreshPair.token(), jwtTokenProvider.accessTokenTtlSeconds());
+        log.info("用户登录成功 userId={}", user.getId());
+        return new TokenResponse(
+                accessToken, refreshPair.token(), jwtTokenProvider.accessTokenTtlSeconds());
     }
 
     /**
@@ -109,8 +120,8 @@ public class AuthService {
 
         tenantService.requireActive(tenantId);
         Long effectiveTenantId = tenantId;
-        return TenantContext.runAs(effectiveTenantId, false,
-                () -> rotateRefreshToken(userId, jti, username));
+        return TenantContext.runAs(
+                effectiveTenantId, false, () -> rotateRefreshToken(userId, jti, username));
     }
 
     private TokenResponse rotateRefreshToken(Long userId, String jti, String username) {
@@ -122,7 +133,9 @@ public class AuthService {
         }
 
         UserEntity user = userMapper.selectById(userId);
-        if (user == null || !"active".equals(user.getStatus()) || !username.equals(user.getUsername())) {
+        if (user == null
+                || !"active".equals(user.getStatus())
+                || !username.equals(user.getUsername())) {
             throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
@@ -136,7 +149,8 @@ public class AuthService {
                 user.getUsername(),
                 Duration.ofSeconds(jwtTokenProvider.refreshTokenTtlSeconds()));
 
-        return new TokenResponse(accessToken, newRefreshPair.token(), jwtTokenProvider.accessTokenTtlSeconds());
+        return new TokenResponse(
+                accessToken, newRefreshPair.token(), jwtTokenProvider.accessTokenTtlSeconds());
     }
 
     /**
@@ -165,7 +179,12 @@ public class AuthService {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
         List<String> permissions = userMapper.selectPermissionCodes(user.getId());
-        return new MeResponse(user.getId(), user.getTenantId(), user.getUsername(), user.getNickname(),
-                loginUser.roles(), permissions);
+        return new MeResponse(
+                user.getId(),
+                user.getTenantId(),
+                user.getUsername(),
+                user.getNickname(),
+                loginUser.roles(),
+                permissions);
     }
 }

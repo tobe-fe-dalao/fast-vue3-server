@@ -2,10 +2,9 @@ package com.fastvue.infrastructure.persistence;
 
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.fastvue.security.SecurityUtils;
+import java.time.OffsetDateTime;
 import org.apache.ibatis.reflection.MetaObject;
 import org.springframework.stereotype.Component;
-
-import java.time.OffsetDateTime;
 
 /**
  * MyBatis-Plus 审计字段自动填充。
@@ -31,11 +30,11 @@ public class AuditMetaObjectHandler implements MetaObjectHandler {
 
     @Override
     public void updateFill(MetaObject metaObject) {
-        strictUpdateFill(metaObject, "updatedAt", OffsetDateTime.class, OffsetDateTime.now());
+        setFieldValByName("updatedAt", OffsetDateTime.now(java.time.ZoneOffset.UTC), metaObject);
 
         Long currentUserId = SecurityUtils.currentUserIdOrNull();
         if (currentUserId != null) {
-            strictUpdateFill(metaObject, "updatedBy", Long.class, currentUserId);
+            setFieldValByName("updatedBy", currentUserId, metaObject);
         }
     }
 }

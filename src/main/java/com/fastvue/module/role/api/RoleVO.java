@@ -14,5 +14,4 @@ public record RoleVO(
         List<String> permissions,
         List<Long> menuIds,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt) {
-}
+        OffsetDateTime updatedAt) {}

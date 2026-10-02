@@ -14,5 +14,4 @@ public record PaymentOrderVO(
         String status,
         String checkoutUrl,
         OffsetDateTime createdAt,
-        OffsetDateTime expiresAt) {
-}
+        OffsetDateTime expiresAt) {}

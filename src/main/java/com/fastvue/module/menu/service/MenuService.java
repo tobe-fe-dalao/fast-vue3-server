@@ -3,22 +3,21 @@ package com.fastvue.module.menu.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fastvue.common.exception.BusinessException;
 import com.fastvue.common.exception.ErrorCode;
+import com.fastvue.infrastructure.tenant.TenantContext;
 import com.fastvue.module.menu.api.MenuRequest;
 import com.fastvue.module.menu.api.MenuVO;
 import com.fastvue.module.menu.persistence.MenuEntity;
 import com.fastvue.module.menu.persistence.MenuMapper;
 import com.fastvue.module.user.service.UserService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import com.fastvue.infrastructure.tenant.TenantContext;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 菜单业务逻辑。
@@ -35,11 +34,13 @@ public class MenuService {
      * 查询全部菜单（树形结构）。
      */
     public List<MenuVO> tree() {
-        List<MenuEntity> entities = menuMapper.selectList(
-                new LambdaQueryWrapper<MenuEntity>()
-                        .orderByAsc(MenuEntity::getSort)
-                        .orderByAsc(MenuEntity::getId));
-        return buildTree(entities, 0L);
+        List<MenuEntity> entities =
+                menuMapper.selectList(
+                        new LambdaQueryWrapper<MenuEntity>()
+                                .orderByAsc(MenuEntity::getSort)
+                                .orderByAsc(MenuEntity::getId));
+        return buildTree(
+                entities.stream().collect(Collectors.groupingBy(MenuEntity::getParentId)), 0L);
     }
 
     /**
@@ -58,12 +59,14 @@ public class MenuService {
         if (menuIds == null || menuIds.isEmpty()) {
             return List.of();
         }
-        List<MenuEntity> entities = menuMapper.selectList(
-                new LambdaQueryWrapper<MenuEntity>()
-                        .in(MenuEntity::getId, menuIds)
-                        .orderByAsc(MenuEntity::getSort)
-                        .orderByAsc(MenuEntity::getId));
-        return buildTree(entities, 0L);
+        List<MenuEntity> entities =
+                menuMapper.selectList(
+                        new LambdaQueryWrapper<MenuEntity>()
+                                .in(MenuEntity::getId, menuIds)
+                                .orderByAsc(MenuEntity::getSort)
+                                .orderByAsc(MenuEntity::getId));
+        return buildTree(
+                entities.stream().collect(Collectors.groupingBy(MenuEntity::getParentId)), 0L);
     }
 
     /**
@@ -113,8 +116,9 @@ public class MenuService {
         if (menuMapper.selectById(id) == null) {
             throw new BusinessException(ErrorCode.MENU_NOT_FOUND);
         }
-        Long childCount = menuMapper.selectCount(
-                new LambdaQueryWrapper<MenuEntity>().eq(MenuEntity::getParentId, id));
+        Long childCount =
+                menuMapper.selectCount(
+                        new LambdaQueryWrapper<MenuEntity>().eq(MenuEntity::getParentId, id));
         if (childCount > 0) {
             throw new BusinessException(ErrorCode.CONFLICT, "存在子菜单，无法删除");
         }
@@ -168,21 +172,26 @@ public class MenuService {
     /**
      * 将扁平菜单列表组装为树。
      */
-    private List<MenuVO> buildTree(List<MenuEntity> entities, Long parentId) {
-        Map<Long, List<MenuEntity>> byParent = entities.stream()
-                .collect(Collectors.groupingBy(MenuEntity::getParentId));
-
+    private List<MenuVO> buildTree(Map<Long, List<MenuEntity>> byParent, Long parentId) {
         return byParent.getOrDefault(parentId, List.of()).stream()
-                .sorted(Comparator.comparing(MenuEntity::getSort)
-                        .thenComparing(MenuEntity::getId))
-                .map(entity -> {
-                    MenuVO vo = menuConverter.toVO(entity);
-                    List<MenuVO> children = buildTree(entities, entity.getId());
-                    return new MenuVO(
-                            vo.id(), vo.parentId(), vo.name(), vo.path(), vo.component(),
-                            vo.icon(), vo.sort(), vo.visible(), vo.permission(), vo.type(),
-                            children.isEmpty() ? new ArrayList<>() : children);
-                })
+                .sorted(Comparator.comparing(MenuEntity::getSort).thenComparing(MenuEntity::getId))
+                .map(
+                        entity -> {
+                            MenuVO vo = menuConverter.toVO(entity);
+                            List<MenuVO> children = buildTree(byParent, entity.getId());
+                            return new MenuVO(
+                                    vo.id(),
+                                    vo.parentId(),
+                                    vo.name(),
+                                    vo.path(),
+                                    vo.component(),
+                                    vo.icon(),
+                                    vo.sort(),
+                                    vo.visible(),
+                                    vo.permission(),
+                                    vo.type(),
+                                    children.isEmpty() ? new ArrayList<>() : children);
+                        })
                 .toList();
     }
 }

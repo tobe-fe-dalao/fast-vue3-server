@@ -10,7 +10,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class PublicTenantFilterConfig {
     @Bean
-    public PublicTenantFilter publicTenantFilter(TenantMapper tenantMapper, ObjectMapper objectMapper) {
+    public PublicTenantFilter publicTenantFilter(
+            TenantMapper tenantMapper, ObjectMapper objectMapper) {
         return new PublicTenantFilter(tenantMapper, objectMapper);
     }
 }

@@ -1,13 +1,12 @@
 package com.fastvue.module.user.persistence;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import java.util.List;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-
-import java.util.List;
 
 /**
  * 用户数据访问。
@@ -18,7 +17,8 @@ public interface UserMapper extends BaseMapper<UserEntity> {
     /**
      * 查询用户拥有的角色编码。
      */
-    @Select("""
+    @Select(
+            """
             SELECT r.code
             FROM sys_role r
             JOIN sys_user_role ur ON ur.role_id = r.id
@@ -29,16 +29,19 @@ public interface UserMapper extends BaseMapper<UserEntity> {
     /**
      * 查询用户通过角色间接拥有的权限字符串（去重）。
      */
-    @Select("""
+    @Select(
+            """
             SELECT DISTINCT p.code
             FROM sys_permission p
             JOIN sys_role_permission rp ON rp.permission_id = p.id
             JOIN sys_user_role ur ON ur.role_id = rp.role_id
-            WHERE ur.user_id = #{userId} AND p.deleted = false
+            JOIN sys_role r ON r.id = ur.role_id
+            WHERE ur.user_id = #{userId} AND p.deleted = false AND r.deleted = false
             """)
     List<String> selectPermissionCodes(@Param("userId") Long userId);
 
-    @Select("""
+    @Select(
+            """
             <script>
             SELECT ur.user_id, r.code
             FROM sys_user_role ur JOIN sys_role r ON r.id = ur.role_id
@@ -53,16 +56,19 @@ public interface UserMapper extends BaseMapper<UserEntity> {
     /**
      * 查询用户通过角色间接可访问的菜单 id（去重）。
      */
-    @Select("""
+    @Select(
+            """
             SELECT DISTINCT m.id
             FROM sys_menu m
             JOIN sys_role_menu rm ON rm.menu_id = m.id
             JOIN sys_user_role ur ON ur.role_id = rm.role_id
-            WHERE ur.user_id = #{userId} AND m.deleted = false
+            JOIN sys_role r ON r.id = ur.role_id
+            WHERE ur.user_id = #{userId} AND m.deleted = false AND r.deleted = false
             """)
     List<Long> selectMenuIds(@Param("userId") Long userId);
 
-    @Select("""
+    @Select(
+            """
             SELECT ur.user_id FROM sys_user_role ur
             JOIN sys_role r ON r.id = ur.role_id
             WHERE r.code = #{roleCode} AND r.deleted = false
@@ -72,7 +78,8 @@ public interface UserMapper extends BaseMapper<UserEntity> {
     /**
      * 批量插入用户-角色关联。
      */
-    @Insert("""
+    @Insert(
+            """
             <script>
             INSERT INTO sys_user_role (tenant_id, user_id, role_id) VALUES
             <foreach collection="roleIds" item="roleId" separator=",">
@@ -80,8 +87,10 @@ public interface UserMapper extends BaseMapper<UserEntity> {
             </foreach>
             </script>
             """)
-    void insertUserRoles(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
-                         @Param("roleIds") List<Long> roleIds);
+    void insertUserRoles(
+            @Param("tenantId") Long tenantId,
+            @Param("userId") Long userId,
+            @Param("roleIds") List<Long> roleIds);
 
     /**
      * 删除用户的所有角色关联。

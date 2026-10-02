@@ -3,17 +3,14 @@ package com.fastvue.module.permission.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fastvue.common.exception.BusinessException;
 import com.fastvue.common.exception.ErrorCode;
+import com.fastvue.infrastructure.tenant.TenantContext;
 import com.fastvue.module.permission.api.PermissionRequest;
 import com.fastvue.module.permission.api.PermissionVO;
 import com.fastvue.module.permission.persistence.PermissionEntity;
 import com.fastvue.module.permission.persistence.PermissionMapper;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
-import com.fastvue.security.PermissionCache;
-import org.springframework.beans.factory.annotation.Autowired;
-import com.fastvue.infrastructure.tenant.TenantContext;
 
 /**
  * 权限业务逻辑。
@@ -25,15 +22,14 @@ public class PermissionService {
     private final PermissionMapper permissionMapper;
     private final PermissionConverter permissionConverter;
 
-    @Autowired(required = false)
-    private PermissionCache permissionCache;
-
     /**
      * 查询全部权限。
      */
     public List<PermissionVO> list() {
-        return permissionMapper.selectList(
-                        new LambdaQueryWrapper<PermissionEntity>().orderByAsc(PermissionEntity::getId))
+        return permissionMapper
+                .selectList(
+                        new LambdaQueryWrapper<PermissionEntity>()
+                                .orderByAsc(PermissionEntity::getId))
                 .stream()
                 .map(permissionConverter::toVO)
                 .toList();
@@ -52,7 +48,6 @@ public class PermissionService {
         entity.setName(request.name());
         entity.setDescription(request.description());
         permissionMapper.insert(entity);
-        invalidatePermissions();
         return permissionConverter.toVO(entity);
     }
 
@@ -68,7 +63,6 @@ public class PermissionService {
         entity.setName(request.name());
         entity.setDescription(request.description());
         permissionMapper.updateById(entity);
-        invalidatePermissions();
         return permissionConverter.toVO(entity);
     }
 
@@ -81,16 +75,13 @@ public class PermissionService {
             throw new BusinessException(ErrorCode.PERMISSION_NOT_FOUND);
         }
         permissionMapper.deleteById(id);
-        invalidatePermissions();
     }
 
     private boolean existsByCode(String code) {
         return permissionMapper.selectCount(
-                new LambdaQueryWrapper<PermissionEntity>().eq(PermissionEntity::getCode, code)) > 0;
-    }
-
-    private void invalidatePermissions() {
-        if (permissionCache != null) permissionCache.invalidateAll();
+                        new LambdaQueryWrapper<PermissionEntity>()
+                                .eq(PermissionEntity::getCode, code))
+                > 0;
     }
 
     private void requireSystemAdministrator() {

@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface NotificationMapper extends BaseMapper<NotificationEntity> {
-    @Update("UPDATE sys_notification SET read = true, updated_at = now() WHERE receiver_id = #{receiverId} AND read = false")
+    @Update(
+            "UPDATE sys_notification SET read = true, updated_at = now() WHERE receiver_id = #{receiverId} AND read = false")
     void markAllRead(@Param("receiverId") Long receiverId);
 }

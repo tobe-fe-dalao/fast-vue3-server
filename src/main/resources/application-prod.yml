@@ -13,11 +13,26 @@ spring:
     locations: classpath:db/migration
 
 app:
+  demo:
+    enabled: false
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS}
+  storage:
+    local-root: ${FILE_STORAGE_ROOT}
   jwt:
     secret: ${JWT_SECRET}
   admin:
     password: ${ADMIN_PASSWORD}
 
 logging:
+  structured:
+    format:
+      console: ecs
   level:
     com.fastvue: info
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

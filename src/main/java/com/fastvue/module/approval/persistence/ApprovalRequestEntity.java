@@ -19,6 +19,5 @@ public class ApprovalRequestEntity extends BaseEntity {
     private String status;
     private Integer currentStep;
     private String payload;
-    @Version
-    private Integer version;
+    @Version private Integer version;
 }

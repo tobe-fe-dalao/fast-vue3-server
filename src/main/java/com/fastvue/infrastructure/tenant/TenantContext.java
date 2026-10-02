@@ -7,8 +7,7 @@ public final class TenantContext {
 
     private static final ThreadLocal<State> CURRENT = new ThreadLocal<>();
 
-    private TenantContext() {
-    }
+    private TenantContext() {}
 
     public static void set(Long tenantId, boolean superAdmin) {
         CURRENT.set(new State(tenantId, superAdmin));
@@ -43,12 +42,14 @@ public final class TenantContext {
     }
 
     public static void runAs(Long tenantId, boolean superAdmin, Runnable action) {
-        runAs(tenantId, superAdmin, () -> {
-            action.run();
-            return null;
-        });
+        runAs(
+                tenantId,
+                superAdmin,
+                () -> {
+                    action.run();
+                    return null;
+                });
     }
 
-    private record State(Long tenantId, boolean superAdmin) {
-    }
+    private record State(Long tenantId, boolean superAdmin) {}
 }

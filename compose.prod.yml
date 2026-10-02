@@ -1,0 +1,74 @@
+# Independent production compose file; do not combine with development compose.yml.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fastvue3
+      POSTGRES_USER: fastvue3
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fastvue3 -d fastvue3"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  app:
+    build: .
+    restart: unless-stopped
+    stop_grace_period: 45s
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: jdbc:postgresql://postgres:5432/fastvue3
+      DATABASE_USERNAME: fastvue3
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-900}
+      JWT_REFRESH_TOKEN_TTL: ${JWT_REFRESH_TOKEN_TTL:-604800}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      DB_POOL_MIN: ${DB_POOL_MIN:-2}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD}
+      CORS_ALLOWED_ORIGIN_PATTERNS: ${CORS_ALLOWED_ORIGIN_PATTERNS:?Set explicit HTTPS origins}
+      FILE_STORAGE_ROOT: /app/uploads
+      FILE_PUBLIC_BASE_URL: ${FILE_PUBLIC_BASE_URL:-/api/v1/files}
+      FILE_MAX_SIZE_BYTES: ${FILE_MAX_SIZE_BYTES:-10485760}
+      DB_STATEMENT_TIMEOUT_SECONDS: ${DB_STATEMENT_TIMEOUT_SECONDS:-15}
+      DB_TRANSACTION_TIMEOUT_SECONDS: ${DB_TRANSACTION_TIMEOUT_SECONDS:-20}
+      DB_LOCK_TIMEOUT_MILLIS: ${DB_LOCK_TIMEOUT_MILLIS:-5000}
+      FILE_MAX_REQUEST_SIZE_BYTES: ${FILE_MAX_REQUEST_SIZE_BYTES:-11534336}
+      NOTIFICATION_BATCH_SIZE: ${NOTIFICATION_BATCH_SIZE:-20}
+      NOTIFICATION_MAX_ATTEMPTS: ${NOTIFICATION_MAX_ATTEMPTS:-10}
+      NOTIFICATION_POLL_INTERVAL_MS: ${NOTIFICATION_POLL_INTERVAL_MS:-5000}
+    volumes:
+      - uploads:/app/uploads
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:

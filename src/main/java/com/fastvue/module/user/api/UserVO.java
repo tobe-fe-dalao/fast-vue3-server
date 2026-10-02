@@ -15,5 +15,4 @@ public record UserVO(
         String status,
         List<String> roles,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt) {
-}
+        OffsetDateTime updatedAt) {}

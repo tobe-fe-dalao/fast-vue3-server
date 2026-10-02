@@ -5,6 +5,7 @@ import com.fastvue.module.content.service.CategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -15,8 +16,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * 分类管理接口。
@@ -53,7 +52,8 @@ public class CategoryController {
     @Operation(summary = "更新分类")
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('content:update')")
-    public ApiResponse<CategoryVO> update(@PathVariable Long id, @Valid @RequestBody UpdateCategoryRequest request) {
+    public ApiResponse<CategoryVO> update(
+            @PathVariable Long id, @Valid @RequestBody UpdateCategoryRequest request) {
         return ApiResponse.success(categoryService.update(id, request));
     }
 

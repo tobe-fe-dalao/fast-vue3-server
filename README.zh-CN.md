@@ -1,388 +1,75 @@
 # fast-vue3-server
 
-**语言：** [English](./README.md) | 简体中文 | [繁體中文（台灣）](./README.zh-TW.md) | [繁體中文（香港）](./README.zh-HK.md) | [日本語](./README.ja.md)
+[English](./README.md) · [简体中文](./README.zh-CN.md) · [繁體中文（台灣）](./README.zh-TW.md) · [繁體中文（香港）](./README.zh-HK.md) · [日本語](./README.ja.md)
 
-[fast-vue3](https://github.com/tobe-fe-dalao/fast-vue3) 的官方参考后端服务。
+Fast Vue3 的 Java 服务端，提供共享 `/api/v1` 契约。
 
-在线文档：<https://tobe-fe-dalao.github.io/fast-vue3-site/zh/server/>
+技术基线为 Java 21、Spring Boot 3.5.16、Spring MVC/Security、MyBatis-Plus、PostgreSQL 16、Redis 7、Flyway、JUnit 5 与 Testcontainers。保留 `module/<业务域>/{api,service,persistence}` 模块，Controller 返回 DTO，Service 管理业务与事务。
 
-一个现代、清晰、易维护的 **模块化单体（Modular Monolith）** Spring Boot 项目，为 fast-vue3 提供多租户、组织、项目任务、审批、通知和 RBAC 参考实现。它保持单体部署和明确的业务边界，便于运行、维护和前端对接。
+[Documentation](https://tobe-fe-dalao.github.io/fast-vue3-site/zh/server/) · [Configuration](https://tobe-fe-dalao.github.io/fast-vue3-site/zh/server/guide/configuration) · [API contracts](https://tobe-fe-dalao.github.io/fast-vue3-site/zh/server/api/contracts)
 
-## 技术栈
+## 本地开发
 
-| 类别 | 选型 |
-|---|---|
-| 语言 / 运行时 | Java 21 |
-| 框架 | Spring Boot 3.x（Spring MVC） |
-| 安全 | Spring Security + JWT（Access + Refresh） |
-| ORM | MyBatis-Plus（复杂查询自行写 SQL） |
-| 数据库 | PostgreSQL |
-| 缓存 | Redis（Refresh Token、权限缓存、限流、幂等） |
-| 迁移 | Flyway |
-| 对象转换 | MapStruct |
-| 简化样板 | Lombok |
-| 文档 | Springdoc OpenAPI / Swagger UI |
-| 构建 | Maven（含 Maven Wrapper） |
-| 容器 | Docker + Docker Compose |
-| 测试 | JUnit 5 + Spring Boot Test + Testcontainers |
-
-## 架构说明
-
-项目采用 **按业务模块纵向切分** 的模块化单体，而非全局的 `controller / service / mapper / entity` 横向分层。
-
-```
-com.fastvue
-├── common/
-│   ├── response/      # ApiResponse / PageResponse
-│   └── exception/     # 错误码、业务异常、全局异常处理
-├── config/            # MyBatis-Plus / Jackson / OpenAPI / 管理员初始化 等配置
-├── infrastructure/
-│   ├── persistence/   # BaseEntity（审计字段）、审计自动填充
-│   ├── tenant/        # 租户上下文和公开接口租户解析
-│   ├── storage/       # FileStorage 抽象与本地实现
-│   └── idempotency/   # Redis 幂等请求声明
-├── security/          # JWT、认证过滤器、SecurityConfig、当前用户上下文、RefreshToken 存储
-└── module/            # 业务模块；模块内部统一分为 api / service / persistence
-    ├── auth/
-    ├── user/
-    ├── role/
-    ├── permission/
-    ├── menu/
-    ├── tenant/organization/
-    ├── project/task/
-    └── approval/notification/audit/
+```bash
+cp .env.example .env
+docker compose --profile app up -d --build
 ```
 
-### 模块示例（user）
-
-```
-module/user/
-├── api/
-│   ├── UserController.java
-│   ├── CreateUserRequest.java
-│   ├── UpdateUserRequest.java
-│   ├── UserQueryRequest.java
-│   └── UserVO.java
-├── service/
-│   ├── UserService.java
-│   └── UserConverter.java
-└── persistence/
-    ├── UserEntity.java
-    └── UserMapper.java
-```
-
-### 设计原则
-
-- `api` 只处理 HTTP 契约，`service` 处理业务，`persistence` 处理数据访问，**Controller 不直接调用 Mapper**。
-- DTO 优先使用 Java 21 `record`，使用 Jakarta Validation 校验。
-- 不把 Entity 暴露到 Controller 层，通过 MapStruct 转换为 VO。
-- 没有 BaseController / BaseService / 大量自定义通用父类，避免过度抽象。
-- 统一响应 `ApiResponse` 与分页 `PageResponse`，全局异常处理 `@RestControllerAdvice`。
-
-## 企业业务架构
-
-服务仍以一个 Spring Boot 进程部署，各业务能力按纵向模块隔离。Controller 只负责 HTTP 契约，Service 负责权限、事务和状态机，Mapper 负责持久化；PostgreSQL 是事实来源，Redis 只用于确有价值的短期协调与高频读取。
-
-```mermaid
-flowchart LR
-    Client[fast-vue3 客户端] --> Security[JWT + RBAC + 限流]
-    Security --> API[模块 API]
-    API --> Service[业务 Service]
-    Service --> Mapper[MyBatis-Plus / 手写 SQL]
-    Mapper --> PG[(PostgreSQL)]
-    Service --> Redis[(Redis)]
-    Service --> Event[事务提交后事件]
-    Event --> Notify[通知 / 业务活动]
-    API --> Metrics[Actuator + Prometheus]
-```
-
-### 多租户隔离
-
-登录请求通过 `tenantCode` 选择租户，签名后的 Access/Refresh Token 携带 `tenantId`。认证过滤器把租户写入 `TenantContext`，MyBatis 租户拦截器自动为受保护表追加 `tenant_id` 条件。只有默认租户的初始系统管理员（用户 1，持有 `admin` 角色）可以进入跨租户路径；普通 `tenant-admin` 仍受本租户限制。匿名 `/api/v1/public/**` 使用 `X-Tenant-Code`，缺省为 `default`。
-
-```mermaid
-sequenceDiagram
-    participant C as 客户端
-    participant J as JWT 过滤器
-    participant T as TenantContext
-    participant M as MyBatis 租户拦截器
-    participant D as PostgreSQL
-    C->>J: Access Token
-    J->>T: tenantId + 当前用户
-    T->>M: 当前租户边界
-    M->>D: WHERE id=? AND tenant_id=?
-    D-->>C: 本租户数据或安全的 404
-```
-
-系统管理员创建租户时会在同一事务内开通 Organization、隔离的 `tenant-admin` 角色、权限/菜单关联和初始管理员账号。租户停用或到期后，登录、刷新令牌和已有 Access Token 都不能继续访问。
-
-### Project / Task 业务域
-
-项目创建者自动成为 Owner 和成员。非项目成员不能访问项目或创建任务；负责人必须是项目成员；归档项目不能新增任务或变更成员；项目采用归档而非物理删除。Project、Task 都使用 `version` 乐观锁，过期写入明确返回 HTTP 409。
-
-```mermaid
-stateDiagram-v2
-    [*] --> TODO
-    TODO --> IN_PROGRESS
-    TODO --> CANCELLED
-    IN_PROGRESS --> BLOCKED
-    IN_PROGRESS --> DONE
-    IN_PROGRESS --> CANCELLED
-    BLOCKED --> IN_PROGRESS
-    BLOCKED --> CANCELLED
-    DONE --> [*]
-    CANCELLED --> [*]
-```
-
-TaskActivity 记录操作者、时间、动作、字段、旧值和新值；评论、指派和状态变更与业务写入处于同一事务。
-
-### 审批、事件和通知
-
-审批状态为 `DRAFT / PENDING / APPROVED / REJECTED / CANCELLED`。参考流程固定为部门负责人后接租户管理员，不引入 BPMN 引擎。状态转换只存在于 Service，非法转换返回 409。
-
-```mermaid
-sequenceDiagram
-    participant U as 申请人
-    participant S as ApprovalService
-    participant M as 部门负责人
-    participant A as 租户管理员
-    participant N as 提交后通知
-    U->>S: 创建草稿并提交 Idempotency-Key
-    S-->>M: 待审批
-    M->>S: 同意
-    S-->>A: 待审批
-    A->>S: 同意或拒绝
-    S-->>N: AFTER_COMMIT 事件
-    N-->>U: 最终结果通知
-```
-
-- `POST /api/v1/projects` 和审批提交使用 Redis `SET NX` 形式的分布式幂等声明。
-- Notification 在 `@TransactionalEventListener(AFTER_COMMIT)` 中创建，回滚事务不会提前发通知。
-- OperationLog 只保存请求元数据，不记录请求体、密码或 Token；Project/Task Activity 独立保存业务语义。
-- 日志关联字段为 `requestId / tenantId / userId`，Prometheus 同时暴露 HTTP、Hikari 和业务计数指标。
-- 文件上传通过 `FileStorage` 抽象限制大小、MIME、扩展名和文件签名，并阻止路径穿越。
-
-## 项目目录
-
-```
-fast-vue3-server/
-├── pom.xml
-├── mvnw / mvnw.cmd / .mvn/wrapper/     # Maven Wrapper
-├── Dockerfile
-├── compose.yml
-├── .env.example
-├── README.md
-└── src/
-    ├── main/java/com/fastvue/
-    └── main/resources/
-        ├── application.yml
-        ├── application-dev.yml
-        ├── application-prod.yml
-        └── db/migration/
-            ├── V1__init_schema.sql
-            ├── V2__init_permissions.sql
-            ├── V3__init_admin.sql
-            └── V9__enterprise_domains.sql  # V4-V8 保持原有迁移顺序
-```
-
-## 本地运行
-
-### 前置条件
-
-- JDK 21
-- Docker（用于启动 PostgreSQL 与 Redis）
-
-### 1. 启动基础设施
+Java 21:
 
 ```bash
 docker compose up -d
-```
-
-等待 PostgreSQL 和 Redis 变为 healthy：
-
-```bash
-docker compose ps
-```
-
-### 2. 启动应用
-
-```bash
+set -a
+source .env
+set +a
 ./mvnw spring-boot:run
 ```
 
-应用默认监听 `http://localhost:8080`，启动时自动执行 Flyway 迁移并初始化默认管理员。
+- API: `http://localhost:8080/api/v1`
+- Health: `http://localhost:8080/actuator/health`
+- Swagger: `http://localhost:8080/swagger-ui.html` (development)
+- Development only: `admin / admin123`
 
-可用健康检查确认后端已就绪：
-
-```bash
-curl http://localhost:8080/actuator/health
-# {"status":"UP"}
-```
-
-## Docker Compose
-
-Docker Desktop 与 OrbStack 都提供兼容的 `docker compose` 命令；以下完整容器模式不需要本机安装 Java。
-
-`compose.yml` 默认启动 PostgreSQL 与 Redis：
+## 构建与测试
 
 ```bash
-docker compose up -d
+./mvnw spotless:apply
+./mvnw spotless:check checkstyle:check
+./mvnw -DskipTests test-compile pmd:check spotbugs:check
+./mvnw test
+./mvnw clean verify
 ```
 
-如需连同应用一起以容器方式运行：
+质量工具分工：Spotless 3.10.4 使用 google-java-format 1.28.0 的 AOSP 4 空格风格，自动整理格式与导入；Checkstyle 保留项目基础规范；PMD 插件 3.28.0（PMD 7.17.0）检查主代码和测试的资源管理、无用代码及认知复杂度（方法阈值 25）；SpotBugs 4.10.5.0 按默认置信度分析生产字节码；Error Prone 2.43.0 在 Java 21 编译时执行配置中的 21 项错误规则，与现有 Lombok/MapStruct 处理器共存。
+
+`validate` 执行格式和 Checkstyle 检查，主代码与测试编译时运行 Error Prone，`verify` 执行 PMD/SpotBugs。构建只检查，格式修复需显式执行 `spotless:apply`。以上静态检查无需 Docker，生成代码排除在分析范围外。规则位于 `config/`；报告为 `target/checkstyle-result.xml`、`target/pmd.xml`、`target/spotbugsXml.xml`，CI 统一归档。
+
+排除规则按类型、方法和规则限定：保留现有请求/响应 DTO 的集合引用约定，仅排除列明类型的集合暴露告警；共享 Spring Bean 的构造器引用、已校验请求 ID 的响应头写入、CORS 条件防御性复制均有单独说明。PMD 认可 `finally` 中的线程池关闭，纯 Mockito JDBC 夹具仅局部排除资源关闭告警。未全局关闭空值、资源或其他缺陷检测。
+
+`test-compile` 只检查主代码和测试代码的编译类型；未检查转换、原始泛型、过时 API 告警及 MapStruct 目标字段遗漏会导致编译失败。`test` 运行 JUnit/Mockito/MockMvc，无需 Docker。`clean verify` 另外通过 Failsafe 执行 PostgreSQL/Redis 集成测试并打包；必须有 Docker，环境缺失会失败，不再静默跳过。JaCoCo 将合并覆盖率写入 `target/site/jacoco/index.html` 和 `jacoco.xml`。本地验证不代表远端 CI 结果。
+
+## Production
+
+生产使用独立的 `compose.prod.yml`，不要与开发 Compose 合并。通过私有 `.env.prod` 或密钥管理服务提供所有必填配置。JWT 随机密钥至少 32 字节；初始化密码至少 12 个字符，最多 72 个 UTF-8 字节。CORS 只接受明确的 HTTPS Origin。启动时拒绝开发 Profile、占位密钥和演示适配器。
 
 ```bash
-docker compose --profile app up -d --build
-docker compose ps
+cp .env.prod.example .env.prod
+# Supply required secrets and explicit HTTPS origins before running.
+docker compose --env-file .env.prod -f compose.prod.yml up -d --build
 ```
 
-这种方式只需 Docker，本机无需安装 JDK 21。查看启动日志：
+Health 和 liveness/readiness 匿名开放，不返回基础设施细节。Readiness 检查 PostgreSQL、Redis，liveness 只检查应用状态。Metrics 与 Prometheus 需要 `audit:view`。生产 ECS JSON 日志包含请求 ID、租户/用户上下文和 HTTP 延迟，不记录敏感请求头或请求体。没有配置 Trace 导出，不能视为完整 OpenTelemetry 链路追踪。
 
-```bash
-docker compose --profile app logs -f app
-```
+生产关闭演示仪表盘、分析及门户静态数据；演示支付结算返回 503，且不写订单。真实支付渠道、签名回调、流水及支付幂等需要业务集成；现有结算不能收取真实资金。
 
-## 环境变量
+## 运行边界与通知恢复
 
-| 变量 | 说明 | 默认值（dev） |
-|---|---|---|
-| `DATABASE_URL` | PostgreSQL JDBC 地址 | `jdbc:postgresql://localhost:5432/fastvue3` |
-| `DATABASE_USERNAME` | 数据库用户名 | `fastvue3` |
-| `DATABASE_PASSWORD` | 数据库密码 | `fastvue3` |
-| `REDIS_HOST` | Redis 地址 | `localhost` |
-| `REDIS_PORT` | Redis 端口 | `6379` |
-| `CORS_ALLOWED_ORIGIN_PATTERNS` | 允许的前端来源（逗号分隔） | `http://localhost:*` |
-| `JWT_SECRET` | JWT 签名密钥（≥32 字节） | 见 `application.yml`（**生产必须替换**） |
-| `ADMIN_PASSWORD` | 默认管理员密码 | 未设置且为 dev 时回退 `admin123` |
+- 数据库默认锁等待 5 秒、SQL 15 秒、事务 20 秒；通过 `DB_LOCK_TIMEOUT_MILLIS`、`DB_STATEMENT_TIMEOUT_SECONDS`、`DB_TRANSACTION_TIMEOUT_SECONDS` 调整，启动时校验顺序。事务超时约束数据库操作，不是整个 HTTP 请求的强制截止时间。
+- 上传业务层与 Servlet 共用 `FILE_MAX_SIZE_BYTES`（默认 10 MiB）；`FILE_MAX_REQUEST_SIZE_BYTES` 默认 11 MiB，至少额外保留 64 KiB 给 multipart 元数据。Tomcat 以同一有限请求预算吞掉被拒绝的上传体，使预算内的超限上传能完整返回 413。缺少 `file` 返回 400，超限返回 413。
+- 权限、菜单、角色 ID 集合最多 1000 个，拒绝 null 元素；重复角色授权 ID 去重。文章正文最多 1000 段、每段 10000 字符，标签最多 100 个、每个 64 字符。更新集合缺省保持原值，空数组清空。
+- 通知先与业务事务一起写入 PostgreSQL outbox，提交后立即尝试投递；后台默认每 5 秒处理最多 20 条。写通知与确认投递在同一事务提交；多实例通过行锁避免重复消费。失败按 5 秒指数退避，最多间隔 1 小时、默认尝试 10 次；耗尽后保留为 `FAILED`。`NOTIFICATION_BATCH_SIZE`、`NOTIFICATION_MAX_ATTEMPTS`、`NOTIFICATION_POLL_INTERVAL_MS` 可调。
+- 排障时查询 `sys_notification_outbox` 的 `status/attempts/last_error`（仅异常类名）；修复原因后按指定 UUID 将 `FAILED` 更新为 `PENDING`，重置 `attempts=0, next_attempt_at=now(), last_error=NULL`。不要重放 `DELIVERED`。根据保留策略清理已投递历史行；禁止删除未完成行。
+- V12 新增租户内有效分类名称唯一索引。部署前用 `SELECT tenant_id,name,count(*) FROM content_category WHERE NOT deleted GROUP BY tenant_id,name HAVING count(*) > 1;` 检查并由业务方处理历史重复名；迁移遇到重复会失败，不会自动改名或删数据。V13 新增通知 outbox。
+- `clean verify` 对文章、分类、菜单、限流器、通知投递器逐类要求行覆盖率至少 90%、分支至少 70%；部门服务至少 85%/70%。其余模块保留覆盖率报告，逐步扩大门禁范围。
 
-敏感配置一律通过环境变量读取，源码不硬编码生产密码。
-`prod` profile 启动时强制要求 `JWT_SECRET` 与 `ADMIN_PASSWORD`；仓库内 Compose 的 `app` profile 仅用于开发环境。
-
-## Swagger 地址
-
-启动后访问：
-
-- Swagger UI（页面控件和接口内容可同步切换中文 / 日本語 / English）：<http://localhost:8080/swagger-ui.html>
-- 指定页面语言：`/api-docs-ui/index.html?lang=zh-CN`、`?lang=ja-JP`、`?lang=en-US`
-- 中文 OpenAPI JSON：<http://localhost:8080/v3/api-docs/zh-CN>
-- 日文 OpenAPI JSON：<http://localhost:8080/v3/api-docs/ja-JP>
-- 英文 OpenAPI JSON：<http://localhost:8080/v3/api-docs/en-US>
-- 健康检查：<http://localhost:8080/actuator/health>
-
-Swagger UI 已配置 Bearer Token 安全方案、参数说明和通用错误响应。登录后粘贴 Access Token 即可调试需要认证的接口；公开接口不会要求 Token。
-
-## 文档
-
-架构、快速开始、配置部署、测试策略与接口契约统一维护在 [fast-vue3-site](https://tobe-fe-dalao.github.io/fast-vue3-site/zh/server/)。本仓库只保留必要的运行说明和 Swagger/OpenAPI 实时接口，不再包含 Node.js/VitePress 工具链。
-
-## 默认开发管理员
-
-- 用户名：`admin`
-- 密码：dev 环境默认 `admin123`（可通过 `ADMIN_PASSWORD` 覆盖；**生产必须显式配置**）
-
-密码使用 BCrypt 加密存储，不保存明文。
-
-## API 说明
-
-统一响应信封：
-
-```json
-{ "code": 0, "message": "success", "data": {} }
-```
-
-统一分页：
-
-```json
-{ "code": 0, "message": "success", "data": { "items": [], "page": 1, "pageSize": 20, "total": 100 } }
-```
-
-### 认证
-
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| POST | `/api/v1/auth/login` | 按 `tenantCode` 登录，返回 accessToken / refreshToken / expiresIn |
-| POST | `/api/v1/auth/register` | 按 `tenantCode` 注册普通用户（公开接口） |
-| POST | `/api/v1/auth/logout` | 登出（撤销 Refresh Token） |
-| POST | `/api/v1/auth/refresh` | 刷新令牌（轮换） |
-| GET | `/api/v1/auth/me` | 当前用户信息（含角色与权限） |
-
-登录成功响应：
-
-```json
-{
-  "code": 0,
-  "message": "success",
-  "data": {
-    "accessToken": "...",
-    "refreshToken": "...",
-    "expiresIn": 7200
-  }
-}
-```
-
-`GET /api/v1/auth/me` 响应：
-
-```json
-{
-  "code": 0,
-  "message": "success",
-  "data": {
-    "id": 1,
-    "tenantId": 1,
-    "username": "admin",
-    "nickname": "Administrator",
-    "roles": ["admin"],
-    "permissions": ["user:list", "user:create", "role:list"]
-  }
-}
-```
-
-### RBAC 资源接口
-
-| 模块 | 方法 | 路径 | 权限 |
-|---|---|---|---|
-| 用户 | GET | `/api/v1/users` | `user:list` |
-| 用户 | POST | `/api/v1/users` | `user:create` |
-| 用户 | PUT | `/api/v1/users/{id}` | `user:update` |
-| 用户 | DELETE | `/api/v1/users/{id}` | `user:delete` |
-| 角色 | GET | `/api/v1/roles` | `role:list` |
-| 角色 | POST | `/api/v1/roles` | `role:create` |
-| 角色 | PUT | `/api/v1/roles/{id}` | `role:update` |
-| 角色 | DELETE | `/api/v1/roles/{id}` | `role:delete` |
-| 权限 | GET | `/api/v1/permissions` | `role:list` |
-| 菜单 | GET | `/api/v1/menus` | 当前用户菜单树 |
-| 菜单 | GET | `/api/v1/menus/tree` | `menu:list` |
-
-菜单字段：`id / parentId / name / path / component / icon / sort / visible / permission / type`，`type` 取值 `directory / menu / button`，支持树形结构。
-
-## 数据库迁移
-
-使用 Flyway，迁移脚本位于 `src/main/resources/db/migration/`：
-
-- `V1__init_schema.sql` — 基础表结构（`sys_user / sys_role / sys_permission / sys_menu` 及关联表）
-- `V2__init_permissions.sql` — 权限字符串与菜单初始化
-- `V3__init_admin.sql` — 默认管理员与角色绑定
-
-应用启动时自动执行，无需手动干预。
-
-## 测试方式
-
-```bash
-./mvnw test            # 单元 + 切片测试（无需 Docker）
-./mvnw clean package   # 完整构建（含全部测试）
-```
-
-测试分层：
-
-- **单元测试**（Mockito）：登录成功 / 失败、Refresh Token 校验等。
-- **切片测试**（`@WebMvcTest`）：验证 `@PreAuthorize` 的 401 / 403 / 放行行为。
-- **集成测试**（Testcontainers PostgreSQL）：用户 CRUD 全链路。未安装 Docker 时自动跳过（`disabledWithoutDocker`）。
-
-## 对接 fast-vue3 前端
-
-前端通过 `VITE_APP_API_BASEURL` 切换数据源：
-
-- **Mock 模式**（默认）：`VITE_APP_API_BASEURL=/api/v1`，由 Nitro Mock 服务响应。
-- **真实后端模式**：`VITE_APP_API_BASEURL=http://localhost:8080/api/v1`。
-
-两端统一使用 `{ code: 0, message, data }` 响应信封与 `/api/v1/*` 路径前缀，切换时无需改动业务代码。
+[Architecture and enterprise API](https://tobe-fe-dalao.github.io/fast-vue3-site/zh/server/api/enterprise): thin Controller → Service → MyBatis Mapper; DTO/persistence boundaries, tenant isolation, resource ownership, service transactions, optimistic locking and durable command idempotency. Schema changes are append-only Flyway migrations. Shared API changes must include frontend clients, Nitro mock and tests. Do not commit credentials or generated files.

@@ -18,8 +18,36 @@ public class BusinessMetrics {
         approvalRejected = registry.counter("approval_rejected_total");
     }
 
-    public void projectCreated() { projectCreated.increment(); }
-    public void taskCreated() { taskCreated.increment(); }
-    public void approvalSubmitted() { approvalSubmitted.increment(); }
-    public void approvalRejected() { approvalRejected.increment(); }
+    public void projectCreated() {
+        afterCommit(projectCreated);
+    }
+
+    public void taskCreated() {
+        afterCommit(taskCreated);
+    }
+
+    public void approvalSubmitted() {
+        afterCommit(approvalSubmitted);
+    }
+
+    public void approvalRejected() {
+        afterCommit(approvalRejected);
+    }
+
+    private void afterCommit(Counter counter) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager
+                .isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager
+                    .registerSynchronization(
+                            new org.springframework.transaction.support
+                                    .TransactionSynchronization() {
+                                @Override
+                                public void afterCommit() {
+                                    counter.increment();
+                                }
+                            });
+        } else {
+            counter.increment();
+        }
+    }
 }

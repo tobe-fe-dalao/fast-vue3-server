@@ -18,8 +18,10 @@ public class OrganizationService {
     private final OrganizationMapper mapper;
 
     public OrganizationVO current() {
-        OrganizationEntity value = mapper.selectOne(new LambdaQueryWrapper<OrganizationEntity>()
-                .eq(OrganizationEntity::getTenantId, TenantContext.tenantId()));
+        OrganizationEntity value =
+                mapper.selectOne(
+                        new LambdaQueryWrapper<OrganizationEntity>()
+                                .eq(OrganizationEntity::getTenantId, TenantContext.tenantId()));
         if (value == null) throw new BusinessException(ErrorCode.NOT_FOUND, "组织不存在");
         return toVO(value);
     }
@@ -35,6 +37,11 @@ public class OrganizationService {
     }
 
     private OrganizationVO toVO(OrganizationEntity value) {
-        return new OrganizationVO(value.getId(), value.getTenantId(), value.getName(), value.getCode(), value.getStatus());
+        return new OrganizationVO(
+                value.getId(),
+                value.getTenantId(),
+                value.getName(),
+                value.getCode(),
+                value.getStatus());
     }
 }

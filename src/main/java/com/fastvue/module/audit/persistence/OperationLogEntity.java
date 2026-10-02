@@ -3,16 +3,17 @@ package com.fastvue.module.audit.persistence;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.time.OffsetDateTime;
 
 @Getter
 @Setter
 @TableName("sys_operation_log")
 public class OperationLogEntity {
-    @TableId(type = IdType.AUTO) private Long id;
+    @TableId(type = IdType.AUTO)
+    private Long id;
+
     private String requestId;
     private Long tenantId;
     private Long userId;

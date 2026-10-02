@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Existing passive request/response records intentionally carry collections for Jackson.
+         Changing all DTO ownership contracts is outside this lint integration. Only these
+         reviewed types and representation-exposure patterns are excluded; new types are checked. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Or>
+            <Class name="com.fastvue.common.response.PageResponse"/>
+            <Class name="com.fastvue.module.analytics.api.AnalyticsOverview"/>
+            <Class name="com.fastvue.module.analytics.api.DataOverview"/>
+            <Class name="com.fastvue.module.approval.api.ApprovalModels$ApprovalVO"/>
+            <Class name="com.fastvue.module.auth.api.MeResponse"/>
+            <Class name="com.fastvue.module.content.api.ArticleVO"/>
+            <Class name="com.fastvue.module.content.api.CreateArticleRequest"/>
+            <Class name="com.fastvue.module.content.api.UpdateArticleRequest"/>
+            <Class name="com.fastvue.module.menu.api.MenuVO"/>
+            <Class name="com.fastvue.module.organization.api.DepartmentModels$DepartmentVO"/>
+            <Class name="com.fastvue.module.portal.api.PortalModels$AboutInfo"/>
+            <Class name="com.fastvue.module.portal.api.PortalModels$BlogListResult"/>
+            <Class name="com.fastvue.module.portal.api.PortalModels$BlogPost"/>
+            <Class name="com.fastvue.module.portal.api.PortalModels$DocSection"/>
+            <Class name="com.fastvue.module.portal.api.PortalModels$HomeInfo"/>
+            <Class name="com.fastvue.module.portal.api.PortalModels$PricingPlan"/>
+            <Class name="com.fastvue.module.portal.api.PortalModels$ProductInfo"/>
+            <Class name="com.fastvue.module.project.api.ProjectModels$ProjectVO"/>
+            <Class name="com.fastvue.module.role.api.CreateRoleRequest"/>
+            <Class name="com.fastvue.module.role.api.RoleVO"/>
+            <Class name="com.fastvue.module.role.api.UpdateRoleRequest"/>
+            <Class name="com.fastvue.module.user.api.UpdateUserRequest"/>
+            <Class name="com.fastvue.module.user.api.UserVO"/>
+        </Or>
+    </Match>
+    <!-- Non-null CORS lists are copied with List.copyOf in the compact constructor.
+         Null is retained only for @NotEmpty validation. SpotBugs misses that conditional copy;
+         SecurityCollectionOwnershipTest verifies immutable ownership. -->
+    <Match>
+        <Class name="com.fastvue.config.CorsProperties"/>
+        <Method name="allowedOriginPatterns"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <!-- Spring injects shared services; copying them would break their lifecycle/transaction proxies. -->
+    <Match>
+        <Class name="com.fastvue.module.notification.service.NotificationOutboxDispatcher"/>
+        <Method name="&lt;init&gt;"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <!-- The request ID is constrained to [A-Za-z0-9._-]{1,64}, otherwise replaced with a UUID.
+         RequestCorrelationFilterTest covers CR/LF, invalid characters and oversized input. -->
+    <Match>
+        <Class name="com.fastvue.infrastructure.web.RequestCorrelationFilter"/>
+        <Method name="doFilterInternal"/>
+        <Bug pattern="HRS_REQUEST_PARAMETER_TO_HTTP_HEADER"/>
+    </Match>
+</FindBugsFilter>

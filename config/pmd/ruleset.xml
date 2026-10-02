@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="Fast Vue3 quality" xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.github.io/schema/ruleset_2_0_0.xsd">
+    <description>Focused Java 21 correctness, resource, unused-code and complexity checks; formatting belongs to Spotless.</description>
+    <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
+    <rule ref="category/java/bestpractices.xml/AvoidPrintStackTrace"/>
+    <rule ref="category/java/codestyle.xml/EmptyControlStatement"/>
+    <rule ref="category/java/errorprone.xml/AvoidBranchingStatementAsLastInLoop"/>
+    <rule ref="category/java/errorprone.xml/BrokenNullCheck"/>
+    <rule ref="category/java/errorprone.xml/CloseResource">
+        <!-- ExecutorService shutdown in finally is a supported cleanup pattern. -->
+        <properties><property name="closeTargets" value="close,shutdown,shutdownNow"/></properties>
+    </rule>
+    <rule ref="category/java/errorprone.xml/DoNotThrowExceptionInFinally"/>
+    <rule ref="category/java/errorprone.xml/EqualsNull"/>
+    <rule ref="category/java/errorprone.xml/IdempotentOperations"/>
+    <rule ref="category/java/errorprone.xml/ImplicitSwitchFallThrough"/>
+    <rule ref="category/java/errorprone.xml/InstantiationToGetClass"/>
+    <rule ref="category/java/errorprone.xml/InvalidLogMessageFormat"/>
+    <rule ref="category/java/errorprone.xml/MethodWithSameNameAsEnclosingClass"/>
+    <rule ref="category/java/errorprone.xml/ReturnFromFinallyBlock"/>
+    <rule ref="category/java/errorprone.xml/UnconditionalIfStatement"/>
+    <rule ref="category/java/errorprone.xml/UseEqualsToCompareStrings"/>
+    <rule ref="category/java/errorprone.xml/EmptyCatchBlock">
+        <properties><property name="allowCommentedBlocks" value="true"/></properties>
+    </rule>
+    <rule ref="category/java/design.xml/CognitiveComplexity">
+        <properties>
+            <property name="reportLevel" value="25"/>
+        </properties>
+    </rule>
+</ruleset>

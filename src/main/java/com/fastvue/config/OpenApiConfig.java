@@ -21,17 +21,21 @@ public class OpenApiConfig {
     @Bean
     public OpenAPI openAPI() {
         return new OpenAPI()
-                .info(new Info()
-                        .title("fast-vue3-server API")
-                        .description("fast-vue3 官方参考后端接口文档；请在 Swagger UI 顶部切换语言。")
-                        .version("0.1.0"))
-                .components(new Components().addSecuritySchemes(
-                        SECURITY_SCHEME_NAME,
-                        new SecurityScheme()
-                                .type(SecurityScheme.Type.HTTP)
-                                .scheme("bearer")
-                                .bearerFormat("JWT")
-                                .description("请输入登录接口返回的 Access Token，无需添加 Bearer 前缀。")));
+                .info(
+                        new Info()
+                                .title("fast-vue3-server API")
+                                .description("fast-vue3 官方参考后端接口文档；请在 Swagger UI 顶部切换语言。")
+                                .version("0.1.0"))
+                .components(
+                        new Components()
+                                .addSecuritySchemes(
+                                        SECURITY_SCHEME_NAME,
+                                        new SecurityScheme()
+                                                .type(SecurityScheme.Type.HTTP)
+                                                .scheme("bearer")
+                                                .bearerFormat("JWT")
+                                                .description(
+                                                        "请输入登录接口返回的 Access Token，无需添加 Bearer 前缀。")));
     }
 
     @Bean
@@ -50,9 +54,7 @@ public class OpenApiConfig {
     }
 
     private GroupedOpenApi localizedGroup(
-            String group,
-            String displayName,
-            OpenApiDocumentationCustomizer.Language language) {
+            String group, String displayName, OpenApiDocumentationCustomizer.Language language) {
         return GroupedOpenApi.builder()
                 .group(group)
                 .displayName(displayName)

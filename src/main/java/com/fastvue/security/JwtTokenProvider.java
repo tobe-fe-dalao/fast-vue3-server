@@ -1,17 +1,16 @@
 package com.fastvue.security;
 
+import com.fastvue.config.JwtProperties;
+import com.fastvue.infrastructure.tenant.TenantContext;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
-import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
-import com.fastvue.infrastructure.tenant.TenantContext;
+import javax.crypto.SecretKey;
+import org.springframework.stereotype.Component;
 
 /**
  * JWT 生成与解析工具。
@@ -20,19 +19,21 @@ import com.fastvue.infrastructure.tenant.TenantContext;
  * Refresh Token 额外携带 {@code jti}，用于在 Redis 中标识与轮换。</p>
  */
 @Component
-public class JwtTokenProvider {
+public final class JwtTokenProvider {
 
     private final SecretKey key;
     private final long accessTokenTtlSeconds;
     private final long refreshTokenTtlSeconds;
 
-    public JwtTokenProvider(
-            @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.access-token-ttl}") long accessTokenTtlSeconds,
-            @Value("${app.jwt.refresh-token-ttl}") long refreshTokenTtlSeconds) {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        this.accessTokenTtlSeconds = accessTokenTtlSeconds;
-        this.refreshTokenTtlSeconds = refreshTokenTtlSeconds;
+    private final String issuer;
+    private final String audience;
+
+    public JwtTokenProvider(JwtProperties properties) {
+        this.key = Keys.hmacShaKeyFor(properties.secret().getBytes(StandardCharsets.UTF_8));
+        this.accessTokenTtlSeconds = properties.accessTokenTtl();
+        this.refreshTokenTtlSeconds = properties.refreshTokenTtl();
+        this.issuer = properties.issuer();
+        this.audience = properties.audience();
     }
 
     /**
@@ -53,15 +54,21 @@ public class JwtTokenProvider {
         return new TokenPair(jti, token);
     }
 
-    private String buildToken(Long userId, String username, String type, String jti, long ttlSeconds) {
+    private String buildToken(
+            Long userId, String username, String type, String jti, long ttlSeconds) {
         Instant now = Instant.now();
-        var builder = Jwts.builder()
-                .subject(String.valueOf(userId))
-                .claim("username", username)
-                .claim("tenantId", TenantContext.tenantId())
-                .claim("type", type)
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(ttlSeconds)));
+        var builder =
+                Jwts.builder()
+                        .issuer(issuer)
+                        .audience()
+                        .add(audience)
+                        .and()
+                        .subject(String.valueOf(userId))
+                        .claim("username", username)
+                        .claim("tenantId", TenantContext.tenantId())
+                        .claim("type", type)
+                        .issuedAt(Date.from(now))
+                        .expiration(Date.from(now.plusSeconds(ttlSeconds)));
         if (jti != null) {
             builder.id(jti);
         }
@@ -72,7 +79,20 @@ public class JwtTokenProvider {
      * 解析并校验签名与过期时间；无效时抛出 {@link io.jsonwebtoken.JwtException}。
      */
     public Claims parse(String token) {
-        return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+        Claims claims =
+                Jwts.parser()
+                        .verifyWith(key)
+                        .requireIssuer(issuer)
+                        .requireAudience(audience)
+                        .build()
+                        .parseSignedClaims(token)
+                        .getPayload();
+        if (claims.getExpiration() == null
+                || claims.getSubject() == null
+                || claims.get("tenantId") == null) {
+            throw new io.jsonwebtoken.MalformedJwtException("Required identity claims are missing");
+        }
+        return claims;
     }
 
     public long accessTokenTtlSeconds() {
@@ -86,6 +106,5 @@ public class JwtTokenProvider {
     /**
      * Refresh Token 生成结果。
      */
-    public record TokenPair(String jti, String token) {
-    }
+    public record TokenPair(String jti, String token) {}
 }

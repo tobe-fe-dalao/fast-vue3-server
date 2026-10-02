@@ -1,19 +1,21 @@
 package com.fastvue.module.site.api;
 
 import com.fastvue.common.response.ApiResponse;
+import com.fastvue.common.response.PageRequest;
+import com.fastvue.common.response.PageResponse;
 import com.fastvue.module.site.service.SiteInteractionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /** Site interactions with explicit public-read/authenticated-write boundaries. */
 @Tag(name = "站点交互")
@@ -30,11 +32,16 @@ public class SiteInteractionController {
         return ApiResponse.success(service.comments(articleId));
     }
 
+    @GetMapping("/public/blog/{articleId}/comments/page")
+    public ApiResponse<PageResponse<BlogCommentVO>> commentsPage(
+            @PathVariable Long articleId, @Valid @ModelAttribute PageRequest request) {
+        return ApiResponse.success(service.commentsPage(articleId, request));
+    }
+
     @Operation(summary = "登录用户发表评论")
     @PostMapping("/blog/{articleId}/comments")
     public ApiResponse<BlogCommentVO> createComment(
-            @PathVariable Long articleId,
-            @Valid @RequestBody CreateBlogCommentRequest request) {
+            @PathVariable Long articleId, @Valid @RequestBody CreateBlogCommentRequest request) {
         return ApiResponse.success(service.createComment(articleId, request));
     }
 

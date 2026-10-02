@@ -54,7 +54,8 @@ public class RoleController {
     @Operation(summary = "更新角色")
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('role:update')")
-    public ApiResponse<RoleVO> update(@PathVariable Long id, @Valid @RequestBody UpdateRoleRequest request) {
+    public ApiResponse<RoleVO> update(
+            @PathVariable Long id, @Valid @RequestBody UpdateRoleRequest request) {
         return ApiResponse.success(roleService.update(id, request));
     }
 

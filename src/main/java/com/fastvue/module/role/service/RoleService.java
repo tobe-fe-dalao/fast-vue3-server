@@ -4,24 +4,21 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fastvue.common.exception.BusinessException;
 import com.fastvue.common.exception.ErrorCode;
+import com.fastvue.infrastructure.tenant.TenantContext;
 import com.fastvue.module.role.api.CreateRoleRequest;
 import com.fastvue.module.role.api.RoleQueryRequest;
 import com.fastvue.module.role.api.RoleVO;
 import com.fastvue.module.role.api.UpdateRoleRequest;
 import com.fastvue.module.role.persistence.RoleEntity;
 import com.fastvue.module.role.persistence.RoleMapper;
+import com.fastvue.security.SecurityUtils;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import com.fastvue.security.PermissionCache;
-import org.springframework.beans.factory.annotation.Autowired;
-import com.fastvue.infrastructure.tenant.TenantContext;
-import com.fastvue.security.SecurityUtils;
-
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * 角色业务逻辑。
@@ -33,36 +30,53 @@ public class RoleService {
     private final RoleMapper roleMapper;
     private final RoleConverter roleConverter;
 
-    @Autowired(required = false)
-    private PermissionCache permissionCache;
-
     /**
      * 分页查询角色。
      */
     public Page<RoleVO> page(RoleQueryRequest query) {
         LambdaQueryWrapper<RoleEntity> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(query.keyword())) {
-            wrapper.and(w -> w.like(RoleEntity::getName, query.keyword())
-                    .or()
-                    .like(RoleEntity::getCode, query.keyword()));
+            wrapper.and(
+                    w ->
+                            w.like(RoleEntity::getName, query.keyword())
+                                    .or()
+                                    .like(RoleEntity::getCode, query.keyword()));
         }
         wrapper.orderByAsc(RoleEntity::getId);
 
-        Page<RoleEntity> page = roleMapper.selectPage(new Page<>(query.page(), query.pageSize()), wrapper);
+        Page<RoleEntity> page =
+                roleMapper.selectPage(new Page<>(query.page(), query.pageSize()), wrapper);
         Page<RoleVO> result = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
         List<Long> roleIds = page.getRecords().stream().map(RoleEntity::getId).toList();
-        Map<Long, List<String>> permissions = roleIds.isEmpty() ? Map.of()
-                : roleMapper.selectPermissionRows(roleIds).stream().collect(Collectors.groupingBy(
-                        RoleMapper.RolePermissionRow::roleId,
-                        Collectors.mapping(RoleMapper.RolePermissionRow::code, Collectors.toList())));
-        Map<Long, List<Long>> menus = roleIds.isEmpty() ? Map.of()
-                : roleMapper.selectMenuRows(roleIds).stream().collect(Collectors.groupingBy(
-                        RoleMapper.RoleMenuRow::roleId,
-                        Collectors.mapping(RoleMapper.RoleMenuRow::menuId, Collectors.toList())));
-        result.setRecords(page.getRecords().stream()
-                .map(entity -> toVO(entity, permissions.getOrDefault(entity.getId(), List.of()),
-                        menus.getOrDefault(entity.getId(), List.of())))
-                .toList());
+        Map<Long, List<String>> permissions =
+                roleIds.isEmpty()
+                        ? Map.of()
+                        : roleMapper.selectPermissionRows(roleIds).stream()
+                                .collect(
+                                        Collectors.groupingBy(
+                                                RoleMapper.RolePermissionRow::roleId,
+                                                Collectors.mapping(
+                                                        RoleMapper.RolePermissionRow::code,
+                                                        Collectors.toList())));
+        Map<Long, List<Long>> menus =
+                roleIds.isEmpty()
+                        ? Map.of()
+                        : roleMapper.selectMenuRows(roleIds).stream()
+                                .collect(
+                                        Collectors.groupingBy(
+                                                RoleMapper.RoleMenuRow::roleId,
+                                                Collectors.mapping(
+                                                        RoleMapper.RoleMenuRow::menuId,
+                                                        Collectors.toList())));
+        result.setRecords(
+                page.getRecords().stream()
+                        .map(
+                                entity ->
+                                        toVO(
+                                                entity,
+                                                permissions.getOrDefault(entity.getId(), List.of()),
+                                                menus.getOrDefault(entity.getId(), List.of())))
+                        .toList());
         return result;
     }
 
@@ -96,8 +110,8 @@ public class RoleService {
         entity.setDescription(request.description());
         roleMapper.insert(entity);
 
+        validateGrants(request.permissionIds());
         bindRelations(entity.getId(), request.permissionIds(), request.menuIds());
-        invalidatePermissions();
         return getById(entity.getId());
     }
 
@@ -111,6 +125,7 @@ public class RoleService {
             throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
         }
         requireSystemRoleOwner(entity);
+        validateGrants(request.permissionIds());
 
         if (request.name() != null) {
             entity.setName(request.name());
@@ -123,16 +138,19 @@ public class RoleService {
         if (request.permissionIds() != null) {
             roleMapper.deleteRolePermissions(id);
             if (!request.permissionIds().isEmpty()) {
-                roleMapper.insertRolePermissions(entity.getTenantId(), id, request.permissionIds());
+                roleMapper.insertRolePermissions(
+                        entity.getTenantId(),
+                        id,
+                        request.permissionIds().stream().distinct().toList());
             }
         }
         if (request.menuIds() != null) {
             roleMapper.deleteRoleMenus(id);
             if (!request.menuIds().isEmpty()) {
-                roleMapper.insertRoleMenus(entity.getTenantId(), id, request.menuIds());
+                roleMapper.insertRoleMenus(
+                        entity.getTenantId(), id, request.menuIds().stream().distinct().toList());
             }
         }
-        invalidatePermissions();
 
         return getById(id);
     }
@@ -152,48 +170,68 @@ public class RoleService {
         roleMapper.deleteById(id);
         roleMapper.deleteRolePermissions(id);
         roleMapper.deleteRoleMenus(id);
-        invalidatePermissions();
     }
 
-    private void bindRelations(Long roleId, java.util.List<Long> permissionIds, java.util.List<Long> menuIds) {
+    private void bindRelations(
+            Long roleId, java.util.List<Long> permissionIds, java.util.List<Long> menuIds) {
         if (permissionIds != null && !permissionIds.isEmpty()) {
-            roleMapper.insertRolePermissions(TenantContext.tenantId(), roleId, permissionIds);
+            roleMapper.insertRolePermissions(
+                    TenantContext.tenantId(), roleId, permissionIds.stream().distinct().toList());
         }
         if (menuIds != null && !menuIds.isEmpty()) {
-            roleMapper.insertRoleMenus(TenantContext.tenantId(), roleId, menuIds);
+            roleMapper.insertRoleMenus(
+                    TenantContext.tenantId(), roleId, menuIds.stream().distinct().toList());
         }
     }
 
     private RoleVO toVO(RoleEntity entity) {
-        return toVO(entity, roleMapper.selectPermissionCodes(entity.getId()), roleMapper.selectMenuIds(entity.getId()));
+        return toVO(
+                entity,
+                roleMapper.selectPermissionCodes(entity.getId()),
+                roleMapper.selectMenuIds(entity.getId()));
     }
 
     private RoleVO toVO(RoleEntity entity, List<String> permissionCodes, List<Long> menuIds) {
         RoleVO vo = roleConverter.toVO(entity);
         return new RoleVO(
-                vo.id(), vo.code(), vo.name(), vo.description(),
-                permissionCodes, menuIds,
-                vo.createdAt(), vo.updatedAt());
+                vo.id(),
+                vo.code(),
+                vo.name(),
+                vo.description(),
+                permissionCodes,
+                menuIds,
+                vo.createdAt(),
+                vo.updatedAt());
     }
 
     private boolean existsByCode(String code) {
         return roleMapper.selectCount(
-                new LambdaQueryWrapper<RoleEntity>()
-                        .eq(RoleEntity::getTenantId, TenantContext.tenantId())
-                        .eq(RoleEntity::getCode, code)) > 0;
+                        new LambdaQueryWrapper<RoleEntity>()
+                                .eq(RoleEntity::getTenantId, TenantContext.tenantId())
+                                .eq(RoleEntity::getCode, code))
+                > 0;
     }
 
-    private void invalidatePermissions() {
-        if (permissionCache != null) permissionCache.invalidateAll();
+    private void validateGrants(List<Long> ids) {
+        if (ids == null || ids.isEmpty() || TenantContext.isSuperAdmin()) return;
+        var user = SecurityUtils.currentUserOrNull();
+        List<String> codes =
+                roleMapper.selectPermissionCodesByIds(ids.stream().distinct().toList());
+        if (user == null
+                || codes.size() != ids.stream().distinct().count()
+                || !user.permissions().containsAll(codes)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "不能授予当前用户未持有的权限");
+        }
     }
 
     private void requireSystemRoleOwner(RoleEntity entity) {
         if (entity.getId().equals(1L) && !TenantContext.isSuperAdmin()) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "系统管理员角色只能由系统管理员修改");
         }
-        if ("tenant-admin".equals(entity.getCode()) && !TenantContext.isSuperAdmin()
+        if ("tenant-admin".equals(entity.getCode())
+                && !TenantContext.isSuperAdmin()
                 && (SecurityUtils.currentUserOrNull() == null
-                || !SecurityUtils.currentUserOrNull().roles().contains("tenant-admin"))) {
+                        || !SecurityUtils.currentUserOrNull().roles().contains("tenant-admin"))) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "租户管理员角色只能由租户管理员修改");
         }
     }

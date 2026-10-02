@@ -16,5 +16,4 @@ public record MenuVO(
         Boolean visible,
         String permission,
         String type,
-        List<MenuVO> children) {
-}
+        List<MenuVO> children) {}

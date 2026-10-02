@@ -1,13 +1,13 @@
 package com.fastvue.module.content.service;
 
+import static org.mapstruct.MappingConstants.ComponentModel.SPRING;
+
 import com.fastvue.module.content.api.ArticleVO;
 import com.fastvue.module.content.api.CategoryVO;
 import com.fastvue.module.content.persistence.ArticleEntity;
 import com.fastvue.module.content.persistence.CategoryEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-
-import static org.mapstruct.MappingConstants.ComponentModel.SPRING;
 
 /**
  * 内容实体 <-> VO 转换器。

@@ -1,10 +1,9 @@
 package com.fastvue.security;
 
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
-
 import java.util.Collection;
 import java.util.List;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
 /**
  * 当前登录用户的认证主体。
@@ -19,13 +18,35 @@ public record LoginUser(
         boolean enabled,
         List<String> roles,
         List<String> permissions,
-        Collection<? extends GrantedAuthority> authorities) implements UserDetails {
+        Collection<? extends GrantedAuthority> authorities)
+        implements UserDetails {
 
-    public LoginUser(Long id, Long tenantId, String username, String password, boolean enabled,
-                     List<String> roles, Collection<? extends GrantedAuthority> authorities) {
-        this(id, tenantId, username, password, enabled, roles,
-                authorities.stream().map(GrantedAuthority::getAuthority)
-                        .filter(value -> !value.startsWith("ROLE_")).toList(), authorities);
+    public LoginUser {
+        roles = List.copyOf(roles);
+        permissions = List.copyOf(permissions);
+        authorities = List.copyOf(authorities);
+    }
+
+    public LoginUser(
+            Long id,
+            Long tenantId,
+            String username,
+            String password,
+            boolean enabled,
+            List<String> roles,
+            Collection<? extends GrantedAuthority> authorities) {
+        this(
+                id,
+                tenantId,
+                username,
+                password,
+                enabled,
+                roles,
+                authorities.stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .filter(value -> !value.startsWith("ROLE_"))
+                        .toList(),
+                authorities);
     }
 
     @Override

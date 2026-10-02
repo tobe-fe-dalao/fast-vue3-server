@@ -11,6 +11,10 @@ import java.util.List;
  * @param roles       角色编码列表
  * @param permissions 权限字符串列表
  */
-public record MeResponse(Long id, Long tenantId, String username, String nickname,
-                         List<String> roles, List<String> permissions) {
-}
+public record MeResponse(
+        Long id,
+        Long tenantId,
+        String username,
+        String nickname,
+        List<String> roles,
+        List<String> permissions) {}

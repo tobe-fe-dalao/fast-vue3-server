@@ -1,7 +1,6 @@
 package com.fastvue.common.response;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-
 import java.util.List;
 
 /**
@@ -15,7 +14,17 @@ import java.util.List;
 public record PageResponse<T>(List<T> items, long page, long pageSize, long total) {
 
     public static <T> PageResponse<T> of(IPage<T> page) {
-        return new PageResponse<>(page.getRecords(), page.getCurrent(), page.getSize(), page.getTotal());
+        return new PageResponse<>(
+                page.getRecords(), page.getCurrent(), page.getSize(), page.getTotal());
+    }
+
+    public static <T, R> PageResponse<R> map(
+            IPage<T> page, java.util.function.Function<T, R> converter) {
+        return new PageResponse<>(
+                page.getRecords().stream().map(converter).toList(),
+                page.getCurrent(),
+                page.getSize(),
+                page.getTotal());
     }
 
     public static <T> PageResponse<T> of(List<T> items, long page, long pageSize, long total) {

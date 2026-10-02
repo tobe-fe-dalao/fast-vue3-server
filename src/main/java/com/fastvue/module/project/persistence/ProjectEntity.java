@@ -3,10 +3,9 @@ package com.fastvue.module.project.persistence;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.Version;
 import com.fastvue.infrastructure.persistence.BaseEntity;
+import java.time.LocalDate;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -20,6 +19,5 @@ public class ProjectEntity extends BaseEntity {
     private String status;
     private LocalDate startDate;
     private LocalDate endDate;
-    @Version
-    private Integer version;
+    @Version private Integer version;
 }

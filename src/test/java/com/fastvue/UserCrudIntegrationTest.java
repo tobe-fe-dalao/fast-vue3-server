@@ -1,5 +1,8 @@
 package com.fastvue;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.fastvue.infrastructure.tenant.TenantContext;
 import com.fastvue.module.user.persistence.UserEntity;
 import com.fastvue.module.user.persistence.UserMapper;
 import org.junit.jupiter.api.BeforeAll;
@@ -13,15 +16,12 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import com.fastvue.infrastructure.tenant.TenantContext;
-
 /**
  * 用户 CRUD 集成测试（Testcontainers PostgreSQL）。
  *
  * <p>依赖 Docker 环境。未安装 Docker 时，Testcontainers 会跳过本类测试。</p>
  */
-@Testcontainers(disabledWithoutDocker = true)
+@Testcontainers
 @SpringBootTest
 class UserCrudIntegrationTest {
 
@@ -42,8 +42,7 @@ class UserCrudIntegrationTest {
         registry.add("spring.data.redis.port", () -> "6379");
     }
 
-    @Autowired
-    private UserMapper userMapper;
+    @Autowired private UserMapper userMapper;
 
     @BeforeAll
     static void verifyContainerRunning() {
@@ -53,9 +52,16 @@ class UserCrudIntegrationTest {
     @Test
     @DisplayName("Flyway 迁移后存在默认管理员 admin")
     void defaultAdminExists() {
-        UserEntity admin = TenantContext.runAs(1L, true, () -> userMapper.selectOne(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<UserEntity>()
-                        .eq(UserEntity::getUsername, "admin")));
+        UserEntity admin =
+                TenantContext.runAs(
+                        1L,
+                        true,
+                        () ->
+                                userMapper.selectOne(
+                                        new com.baomidou.mybatisplus.core.conditions.query
+                                                                .LambdaQueryWrapper<
+                                                        UserEntity>()
+                                                .eq(UserEntity::getUsername, "admin")));
         assertThat(admin).isNotNull();
         assertThat(admin.getPassword()).isNotEqualTo("admin"); // 非明文
     }

@@ -3,7 +3,6 @@ package com.fastvue.module.organization.api;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-
 import java.util.List;
 
 public final class DepartmentModels {
@@ -15,13 +14,17 @@ public final class DepartmentModels {
             @NotBlank @Size(max = 64) String code,
             Long leaderId,
             Integer sort,
-            @Pattern(regexp = "active|disabled") String status) {
-    }
+            @Pattern(regexp = "active|disabled") String status) {}
 
-    public record DepartmentVO(Long id, Long parentId, String name, String code, Long leaderId,
-                               Integer sort, String status, List<DepartmentVO> children) {
-    }
+    public record DepartmentVO(
+            Long id,
+            Long parentId,
+            String name,
+            String code,
+            Long leaderId,
+            Integer sort,
+            String status,
+            List<DepartmentVO> children) {}
 
-    public record MemberVO(Long id, String username, String nickname, String status) {
-    }
+    public record MemberVO(Long id, String username, String nickname, String status) {}
 }

@@ -18,8 +18,13 @@ This repository is the Java 21 Spring Boot reference backend for Fast Vue3. It e
 - Start PostgreSQL and Redis with `docker compose up -d`.
 - Run the API locally with `./mvnw spring-boot:run` (JDK 21 required).
 - Run the complete container profile with `docker compose --profile app up -d --build`.
-- Run tests with `./mvnw test`.
-- Run the release-quality Maven lifecycle with `./mvnw clean verify`.
+- Format Java sources with `./mvnw spotless:apply`; check formatting with `./mvnw spotless:check` (AOSP four-space style). Format changes are explicit; builds only check.
+- Lint Java main/test sources with `./mvnw checkstyle:check`; project rules also run in Maven `validate`.
+- Run all source/bytecode quality checks without Docker using `./mvnw -DskipTests test-compile pmd:check spotbugs:check`. Compilation includes curated Error Prone checks with existing Lombok/MapStruct processors; PMD also analyzes tests, SpotBugs analyzes production bytecode. `clean verify` enforces every gate.
+- Rules and narrowly scoped, documented framework exclusions live in `config/`; generated sources are excluded. Do not suppress entire analyzers to make builds pass.
+- Check production/test types without executing tests with `./mvnw -DskipTests test-compile`.
+- Run unit and MockMvc tests without Docker with `./mvnw test`.
+- Run the release-quality Maven lifecycle with `./mvnw clean verify`; Docker is required for Failsafe integration tests. JaCoCo reports are written to `target/site/jacoco/`.
 - Check health at `http://localhost:8080/actuator/health` and Swagger at `http://localhost:8080/swagger-ui.html`.
 
 ## Architecture And API Conventions

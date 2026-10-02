@@ -16,6 +16,10 @@ public enum ErrorCode {
     FORBIDDEN(403, "无权限访问"),
     NOT_FOUND(404, "资源不存在"),
     CONFLICT(409, "数据冲突"),
+    METHOD_NOT_ALLOWED(405, "请求方法不支持"),
+    PAYLOAD_TOO_LARGE(413, "请求内容过大"),
+    UNSUPPORTED_MEDIA_TYPE(415, "请求媒体类型不支持"),
+    SERVICE_UNAVAILABLE(503, "服务暂时不可用"),
     INTERNAL_ERROR(500, "系统异常"),
 
     // ---- 认证 ----

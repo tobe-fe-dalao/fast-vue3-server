@@ -1,10 +1,9 @@
 package com.fastvue.security;
 
+import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
-
-import java.time.Duration;
 
 /**
  * Refresh Token 的 Redis 存储。

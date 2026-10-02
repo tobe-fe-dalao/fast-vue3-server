@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.5</version>
+        <version>3.5.16</version>
         <relativePath/>
     </parent>
 
@@ -21,10 +21,20 @@
         <java.version>21</java.version>
         <mybatis-plus.version>3.5.7</mybatis-plus.version>
         <mapstruct.version>1.6.3</mapstruct.version>
-        <lombok.version>1.18.34</lombok.version>
+        <lombok.version>1.18.42</lombok.version>
         <jjwt.version>0.12.6</jjwt.version>
-        <springdoc.version>2.6.0</springdoc.version>
+        <springdoc.version>2.8.17</springdoc.version>
         <testcontainers.version>1.21.4</testcontainers.version>
+        <jacoco.version>0.8.14</jacoco.version>
+        <jacocoArgLine></jacocoArgLine>
+        <error-prone.version>2.43.0</error-prone.version>
+        <!-- Security fixes released after the Boot BOM; remove overrides when managed versions catch up. -->
+        <tomcat.version>10.1.60</tomcat.version>
+        <jackson-bom.version>2.21.7</jackson-bom.version>
+        <postgresql.version>42.7.12</postgresql.version>
+        <netty.version>4.1.137.Final</netty.version>
+        <log4j2.version>2.25.5</log4j2.version>
+        <commons-lang3.version>3.18.0</commons-lang3.version>
     </properties>
 
     <dependencies>
@@ -168,10 +178,140 @@
             </plugin>
 
             <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>3.10.4</version>
+                <configuration>
+                    <java>
+                        <includes>
+                            <include>src/main/java/**/*.java</include>
+                            <include>src/test/java/**/*.java</include>
+                        </includes>
+                        <googleJavaFormat>
+                            <version>1.28.0</version>
+                            <style>AOSP</style>
+                            <reflowLongStrings>false</reflowLongStrings>
+                            <formatJavadoc>false</formatJavadoc>
+                        </googleJavaFormat>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>java-format</id>
+                        <phase>validate</phase>
+                        <goals><goal>check</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+                <version>3.28.0</version>
+                <configuration>
+                    <targetJdk>21</targetJdk>
+                    <compileSourceRoots>
+                        <compileSourceRoot>${project.basedir}/src/main/java</compileSourceRoot>
+                    </compileSourceRoots>
+                    <skipPmdError>false</skipPmdError>
+                    <includeTests>true</includeTests>
+                    <excludeRoots>
+                        <excludeRoot>${project.build.directory}/generated-sources</excludeRoot>
+                        <excludeRoot>${project.build.directory}/generated-test-sources</excludeRoot>
+                    </excludeRoots>
+                    <rulesets><ruleset>config/pmd/ruleset.xml</ruleset></rulesets>
+                    <printFailingErrors>true</printFailingErrors>
+                    <failOnViolation>true</failOnViolation>
+                    <linkXRef>false</linkXRef>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>java-quality</id>
+                        <phase>verify</phase>
+                        <goals><goal>check</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.10.5.0</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Default</threshold>
+                    <excludeFilterFile>config/spotbugs/exclude.xml</excludeFilterFile>
+                    <includeTests>false</includeTests>
+                    <xmlOutput>true</xmlOutput>
+                    <failOnError>true</failOnError>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>java-bugs</id>
+                        <phase>verify</phase>
+                        <goals><goal>check</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.6.0</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>10.26.1</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <configLocation>config/checkstyle/checkstyle.xml</configLocation>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                    <excludeGeneratedSources>true</excludeGeneratedSources>
+                    <includeResources>false</includeResources>
+                    <includeTestResources>false</includeTestResources>
+                    <consoleOutput>true</consoleOutput>
+                    <failOnViolation>true</failOnViolation>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>java-lint</id>
+                        <phase>validate</phase>
+                        <goals><goal>check</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
+                    <failOnWarning>true</failOnWarning>
+                    <fork>true</fork>
+                    <compilerArgs>
+                        <arg>-Xlint:deprecation,unchecked,rawtypes</arg>
+                        <arg>-XDcompilePolicy=simple</arg>
+                        <arg>--should-stop=ifError=FLOW</arg>
+                        <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
+                        <arg>-Xplugin:ErrorProne -XepDisableAllChecks -XepDisableWarningsInGeneratedCode -XepExcludedPaths:.*/target/generated-.* -Xep:ArrayEquals:ERROR -Xep:ArrayHashCode:ERROR -Xep:BadShiftAmount:ERROR -Xep:BoxedPrimitiveEquality:ERROR -Xep:CollectionIncompatibleType:ERROR -Xep:DeadException:ERROR -Xep:EqualsHashCode:ERROR -Xep:EqualsIncompatibleType:ERROR -Xep:Finally:ERROR -Xep:GetClassOnClass:ERROR -Xep:ImpossibleNullComparison:ERROR -Xep:InvalidPatternSyntax:ERROR -Xep:MathRoundIntLong:ERROR -Xep:ModifyingCollectionWithItself:ERROR -Xep:NullTernary:ERROR -Xep:ReferenceEquality:ERROR -Xep:SelfAssignment:ERROR -Xep:SelfComparison:ERROR -Xep:SizeGreaterThanOrEqualsZero:ERROR -Xep:StreamToString:ERROR -Xep:StringBuilderInitWithChar:ERROR</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+                        <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                        <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                    </compilerArgs>
                     <annotationProcessorPaths>
+                        <path>
+                            <groupId>com.google.errorprone</groupId>
+                            <artifactId>error_prone_core</artifactId>
+                            <version>${error-prone.version}</version>
+                        </path>
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
@@ -189,6 +329,100 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>default-compile</id>
+                        <configuration>
+                            <compilerArgs combine.children="append">
+                                <arg>-Amapstruct.unmappedTargetPolicy=ERROR</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>@{jacocoArgLine} -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
+                    <failIfNoTests>true</failIfNoTests>
+                    <excludes>
+                        <exclude>**/*IntegrationTest.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <argLine>@{jacocoArgLine} -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
+                    <failIfNoTests>true</failIfNoTests>
+                    <includes>
+                        <include>**/*IntegrationTest.java</include>
+                    </includes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <configuration>
+                    <propertyName>jacocoArgLine</propertyName>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>coverage-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>coverage-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>critical-path-coverage</id>
+                        <phase>verify</phase>
+                        <goals><goal>check</goal></goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>com.fastvue.module.content.service.ArticleService</include>
+                                        <include>com.fastvue.module.content.service.CategoryService</include>
+                                        <include>com.fastvue.module.menu.service.MenuService</include>
+                                        <include>com.fastvue.security.RateLimitFilter</include>
+                                        <include>com.fastvue.module.notification.service.NotificationOutboxDispatcher</include>
+                                    </includes>
+                                    <limits>
+                                        <limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.90</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.70</minimum></limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes><include>com.fastvue.module.organization.service.DepartmentService</include></includes>
+                                    <limits>
+                                        <limit><counter>LINE</counter><value>COVEREDRATIO</value><minimum>0.85</minimum></limit>
+                                        <limit><counter>BRANCH</counter><value>COVEREDRATIO</value><minimum>0.70</minimum></limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

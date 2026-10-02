@@ -12,6 +12,7 @@ import lombok.Setter;
 public class OrganizationEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
+
     private Long tenantId;
     private String name;
     private String code;

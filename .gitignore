@@ -29,3 +29,7 @@ target/
 
 ### 环境变量（勿提交真实配置）###
 .env
+
+.env.*
+!.env.example
+!.env.prod.example

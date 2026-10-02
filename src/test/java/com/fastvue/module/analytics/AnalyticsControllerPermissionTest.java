@@ -1,5 +1,9 @@
 package com.fastvue.module.analytics;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.fastvue.common.exception.GlobalExceptionHandler;
 import com.fastvue.module.analytics.api.AnalyticsController;
 import com.fastvue.module.analytics.api.DataController;
@@ -11,32 +15,24 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Permission tests for operating-data endpoints. */
 @WebMvcTest({AnalyticsController.class, DataController.class})
 @Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class})
-class AnalyticsControllerPermissionTest {
+class AnalyticsControllerPermissionTest extends com.fastvue.security.SecurityMvcTestSupport {
 
-    @Autowired
-    private MockMvc mockMvc;
+    @Autowired private MockMvc mockMvc;
 
-    @MockBean
-    private JwtTokenProvider jwtTokenProvider;
+    @MockitoBean private JwtTokenProvider jwtTokenProvider;
 
-    @MockBean
-    private TenantMapper tenantMapper;
+    @MockitoBean private TenantMapper tenantMapper;
 
-    @MockBean
-    private UserDetailsService userDetailsService;
+    @MockitoBean private UserDetailsService userDetailsService;
 
     @Test
     @DisplayName("匿名访问经营数据返回统一 401")

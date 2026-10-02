@@ -1,6 +1,7 @@
 package com.fastvue.infrastructure.storage;
 
 import com.fastvue.common.response.ApiResponse;
+import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
@@ -10,8 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/v1/files")
@@ -26,12 +25,17 @@ public class FileController {
     }
 
     @GetMapping("/{tenantId}/{filename}")
-    public ResponseEntity<Resource> download(@PathVariable Long tenantId, @PathVariable String filename) {
+    public ResponseEntity<Resource> download(
+            @PathVariable Long tenantId, @PathVariable String filename) {
         Resource resource = storage.load(tenantId + "/" + filename);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
-                        .filename(filename, StandardCharsets.UTF_8).build().toString())
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.inline()
+                                .filename(filename, StandardCharsets.UTF_8)
+                                .build()
+                                .toString())
                 .body(resource);
     }
 

@@ -2,10 +2,9 @@ package com.fastvue.module.site.persistence;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fastvue.infrastructure.persistence.BaseEntity;
+import java.time.OffsetDateTime;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.time.OffsetDateTime;
 
 /** Checkout order created before handing off to a payment provider. */
 @Getter

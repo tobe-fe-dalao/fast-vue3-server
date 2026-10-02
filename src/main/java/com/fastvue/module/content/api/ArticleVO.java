@@ -16,5 +16,4 @@ public record ArticleVO(
         String status,
         String summary,
         List<String> tags,
-        String title) {
-}
+        String title) {}

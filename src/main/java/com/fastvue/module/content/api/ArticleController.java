@@ -54,7 +54,8 @@ public class ArticleController {
     @Operation(summary = "更新文章")
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('content:update')")
-    public ApiResponse<ArticleVO> update(@PathVariable Long id, @Valid @RequestBody UpdateArticleRequest request) {
+    public ApiResponse<ArticleVO> update(
+            @PathVariable Long id, @Valid @RequestBody UpdateArticleRequest request) {
         return ApiResponse.success(articleService.update(id, request));
     }
 

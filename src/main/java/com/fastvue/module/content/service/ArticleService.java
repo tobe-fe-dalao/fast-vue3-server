@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fastvue.common.exception.BusinessException;
 import com.fastvue.common.exception.ErrorCode;
+import com.fastvue.infrastructure.tenant.TenantContext;
 import com.fastvue.module.content.api.ArticleQueryRequest;
 import com.fastvue.module.content.api.ArticleVO;
 import com.fastvue.module.content.api.CreateArticleRequest;
@@ -12,18 +13,16 @@ import com.fastvue.module.content.persistence.ArticleEntity;
 import com.fastvue.module.content.persistence.ArticleMapper;
 import com.fastvue.module.content.persistence.CategoryEntity;
 import com.fastvue.module.content.persistence.CategoryMapper;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import com.fastvue.infrastructure.tenant.TenantContext;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 /**
  * 文章业务逻辑。
@@ -42,9 +41,13 @@ public class ArticleService {
     public Page<ArticleVO> page(ArticleQueryRequest query) {
         LambdaQueryWrapper<ArticleEntity> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(query.keyword())) {
-            wrapper.and(w -> w.like(ArticleEntity::getTitle, query.keyword())
-                    .or().like(ArticleEntity::getAuthor, query.keyword())
-                    .or().like(ArticleEntity::getSummary, query.keyword()));
+            wrapper.and(
+                    w ->
+                            w.like(ArticleEntity::getTitle, query.keyword())
+                                    .or()
+                                    .like(ArticleEntity::getAuthor, query.keyword())
+                                    .or()
+                                    .like(ArticleEntity::getSummary, query.keyword()));
         }
         if (StringUtils.hasText(query.status())) {
             wrapper.eq(ArticleEntity::getStatus, query.status());
@@ -54,12 +57,12 @@ public class ArticleService {
         }
         wrapper.orderByDesc(ArticleEntity::getId);
 
-        Page<ArticleEntity> page = articleMapper.selectPage(new Page<>(query.page(), query.pageSize()), wrapper);
-        Map<Long, String> categoryNames = loadCategoryNames();
+        Page<ArticleEntity> page =
+                articleMapper.selectPage(new Page<>(query.page(), query.pageSize()), wrapper);
+        Map<Long, String> categoryNames = loadCategoryNames(page.getRecords());
         Page<ArticleVO> result = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
-        result.setRecords(page.getRecords().stream()
-                .map(entity -> toVO(entity, categoryNames))
-                .toList());
+        result.setRecords(
+                page.getRecords().stream().map(entity -> toVO(entity, categoryNames)).toList());
         return result;
     }
 
@@ -71,7 +74,7 @@ public class ArticleService {
         if (entity == null) {
             throw new BusinessException(ErrorCode.ARTICLE_NOT_FOUND);
         }
-        return toVO(entity, loadCategoryNames());
+        return toVO(entity, loadCategoryNames(List.of(entity)));
     }
 
     /**
@@ -146,21 +149,45 @@ public class ArticleService {
 
     private ArticleVO toVO(ArticleEntity entity, Map<Long, String> categoryNames) {
         ArticleVO vo = contentConverter.toArticleVO(entity);
-        String category = entity.getCategoryId() != null
-                ? categoryNames.getOrDefault(entity.getCategoryId(), "") : "";
-        return new ArticleVO(vo.id(), vo.author(), category, vo.categoryId(), vo.content(),
-                vo.cover(), vo.date(), vo.status(), vo.summary(), vo.tags(), vo.title());
+        String category =
+                entity.getCategoryId() != null
+                        ? categoryNames.getOrDefault(entity.getCategoryId(), "")
+                        : "";
+        return new ArticleVO(
+                vo.id(),
+                vo.author(),
+                category,
+                vo.categoryId(),
+                vo.content(),
+                vo.cover(),
+                vo.date(),
+                vo.status(),
+                vo.summary(),
+                vo.tags(),
+                vo.title());
     }
 
-    private Map<Long, String> loadCategoryNames() {
-        return categoryMapper.selectList(new LambdaQueryWrapper<>()).stream()
-                .collect(Collectors.toMap(CategoryEntity::getId, CategoryEntity::getName,
-                        (a, b) -> a, LinkedHashMap::new));
+    private Map<Long, String> loadCategoryNames(List<ArticleEntity> articles) {
+        List<Long> ids =
+                articles.stream()
+                        .map(ArticleEntity::getCategoryId)
+                        .filter(java.util.Objects::nonNull)
+                        .distinct()
+                        .toList();
+        if (ids.isEmpty()) return Map.of();
+        return categoryMapper.selectBatchIds(ids).stream()
+                .collect(
+                        Collectors.toMap(
+                                CategoryEntity::getId,
+                                CategoryEntity::getName,
+                                (a, b) -> a,
+                                LinkedHashMap::new));
     }
 
     private void validateCategory(Long categoryId, Long tenantId) {
-        if (categoryId != null && TenantContext.runAs(tenantId, false,
-                () -> categoryMapper.selectById(categoryId)) == null) {
+        if (categoryId != null
+                && TenantContext.runAs(tenantId, false, () -> categoryMapper.selectById(categoryId))
+                        == null) {
             throw new BusinessException(ErrorCode.CATEGORY_NOT_FOUND);
         }
     }

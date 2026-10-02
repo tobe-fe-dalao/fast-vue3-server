@@ -3,17 +3,16 @@ package com.fastvue.module.content.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fastvue.common.exception.BusinessException;
 import com.fastvue.common.exception.ErrorCode;
+import com.fastvue.infrastructure.tenant.TenantContext;
 import com.fastvue.module.content.api.CategoryVO;
 import com.fastvue.module.content.api.CreateCategoryRequest;
 import com.fastvue.module.content.api.UpdateCategoryRequest;
 import com.fastvue.module.content.persistence.CategoryEntity;
 import com.fastvue.module.content.persistence.CategoryMapper;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import com.fastvue.infrastructure.tenant.TenantContext;
 
 /**
  * 分类业务逻辑。
@@ -29,7 +28,9 @@ public class CategoryService {
      * 返回全部分类（不分页）。
      */
     public List<CategoryVO> listAll() {
-        return categoryMapper.selectList(new LambdaQueryWrapper<CategoryEntity>().orderByAsc(CategoryEntity::getId))
+        return categoryMapper
+                .selectList(
+                        new LambdaQueryWrapper<CategoryEntity>().orderByAsc(CategoryEntity::getId))
                 .stream()
                 .map(contentConverter::toCategoryVO)
                 .toList();
@@ -106,7 +107,8 @@ public class CategoryService {
     private boolean existsByNameOrSlug(String name, String slug, Long excludeId, Long tenantId) {
         LambdaQueryWrapper<CategoryEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CategoryEntity::getTenantId, tenantId);
-        wrapper.and(w -> w.eq(CategoryEntity::getName, name).or().eq(CategoryEntity::getSlug, slug));
+        wrapper.and(
+                w -> w.eq(CategoryEntity::getName, name).or().eq(CategoryEntity::getSlug, slug));
         if (excludeId != null) {
             wrapper.ne(CategoryEntity::getId, excludeId);
         }

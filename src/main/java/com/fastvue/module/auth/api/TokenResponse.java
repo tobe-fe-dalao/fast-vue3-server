@@ -7,5 +7,4 @@ package com.fastvue.module.auth.api;
  * @param refreshToken Refresh Token
  * @param expiresIn    Access Token 有效期（秒）
  */
-public record TokenResponse(String accessToken, String refreshToken, long expiresIn) {
-}
+public record TokenResponse(String accessToken, String refreshToken, long expiresIn) {}

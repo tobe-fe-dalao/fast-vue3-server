@@ -10,13 +10,12 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.time.OffsetDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
-
-import java.io.IOException;
-import java.time.OffsetDateTime;
 
 /**
  * Resolves tenant identity for anonymous public APIs.
@@ -41,7 +40,8 @@ public class PublicTenantFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+    protected void doFilterInternal(
+            HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         if (TenantContext.tenantId() != null) {
             chain.doFilter(request, response);
@@ -49,15 +49,18 @@ public class PublicTenantFilter extends OncePerRequestFilter {
         }
 
         String requestedCode = request.getHeader(TENANT_CODE_HEADER);
-        String code = requestedCode == null || requestedCode.isBlank() ? "default" : requestedCode.trim();
-        TenantEntity tenant = tenantMapper.selectOne(new LambdaQueryWrapper<TenantEntity>()
-                .eq(TenantEntity::getCode, code));
+        String code =
+                requestedCode == null || requestedCode.isBlank() ? "default" : requestedCode.trim();
+        TenantEntity tenant =
+                tenantMapper.selectOne(
+                        new LambdaQueryWrapper<TenantEntity>().eq(TenantEntity::getCode, code));
         if (tenant == null) {
             writeError(response, ErrorCode.TENANT_NOT_FOUND);
             return;
         }
         if (!"active".equals(tenant.getStatus())
-                || tenant.getExpiredAt() != null && tenant.getExpiredAt().isBefore(OffsetDateTime.now())) {
+                || tenant.getExpiredAt() != null
+                        && tenant.getExpiredAt().isBefore(OffsetDateTime.now())) {
             writeError(response, ErrorCode.TENANT_DISABLED);
             return;
         }

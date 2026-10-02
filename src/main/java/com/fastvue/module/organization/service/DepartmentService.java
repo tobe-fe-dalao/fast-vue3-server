@@ -13,15 +13,14 @@ import com.fastvue.module.organization.persistence.OrganizationEntity;
 import com.fastvue.module.organization.persistence.OrganizationMapper;
 import com.fastvue.module.user.persistence.UserEntity;
 import com.fastvue.module.user.persistence.UserMapper;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -31,9 +30,19 @@ public class DepartmentService {
     private final UserMapper userMapper;
 
     public List<DepartmentVO> tree() {
-        List<DepartmentEntity> all = departmentMapper.selectList(new LambdaQueryWrapper<DepartmentEntity>()
-                .orderByAsc(DepartmentEntity::getSort).orderByAsc(DepartmentEntity::getId));
-        return buildTree(all, null);
+        List<DepartmentEntity> all =
+                departmentMapper.selectList(
+                        new LambdaQueryWrapper<DepartmentEntity>()
+                                .orderByAsc(DepartmentEntity::getSort)
+                                .orderByAsc(DepartmentEntity::getId));
+        return buildTree(
+                all.stream()
+                        .collect(
+                                Collectors.groupingBy(
+                                        value ->
+                                                java.util.Objects.requireNonNullElse(
+                                                        value.getParentId(), 0L))),
+                0L);
     }
 
     public List<MemberVO> members(Long departmentId) {
@@ -41,21 +50,31 @@ public class DepartmentService {
         List<Long> ids = departmentMapper.selectMemberIds(departmentId);
         if (ids.isEmpty()) return List.of();
         return userMapper.selectBatchIds(ids).stream()
-                .map(user -> new MemberVO(user.getId(), user.getUsername(), user.getNickname(), user.getStatus()))
+                .map(
+                        user ->
+                                new MemberVO(
+                                        user.getId(),
+                                        user.getUsername(),
+                                        user.getNickname(),
+                                        user.getStatus()))
                 .toList();
     }
 
     @Transactional
     public DepartmentVO create(SaveRequest request) {
+        organizationMapper.lockByTenantId(TenantContext.tenantId());
         validateUniqueCode(request.code(), null, TenantContext.tenantId());
-        validateLeader(request.leaderId(), TenantContext.tenantId());
+        validateLeader(request.leaderId(), TenantContext.tenantId(), null);
         DepartmentEntity parent = validateParent(null, request.parentId());
-        OrganizationEntity organization = organizationMapper.selectOne(new LambdaQueryWrapper<OrganizationEntity>()
-                .eq(OrganizationEntity::getTenantId, TenantContext.tenantId()));
+        OrganizationEntity organization =
+                organizationMapper.selectOne(
+                        new LambdaQueryWrapper<OrganizationEntity>()
+                                .eq(OrganizationEntity::getTenantId, TenantContext.tenantId()));
         if (organization == null) throw new BusinessException(ErrorCode.NOT_FOUND, "组织不存在");
         DepartmentEntity entity = new DepartmentEntity();
         entity.setTenantId(TenantContext.tenantId());
-        entity.setOrganizationId(parent == null ? organization.getId() : parent.getOrganizationId());
+        entity.setOrganizationId(
+                parent == null ? organization.getId() : parent.getOrganizationId());
         apply(entity, request);
         departmentMapper.insert(entity);
         assignLeaderMembership(entity, null);
@@ -64,10 +83,10 @@ public class DepartmentService {
 
     @Transactional
     public DepartmentVO update(Long id, SaveRequest request) {
-        DepartmentEntity entity = requireDepartment(id);
+        DepartmentEntity entity = lockDepartment(id);
         Long previousLeaderId = entity.getLeaderId();
         validateUniqueCode(request.code(), id, entity.getTenantId());
-        validateLeader(request.leaderId(), entity.getTenantId());
+        validateLeader(request.leaderId(), entity.getTenantId(), id);
         DepartmentEntity parent = validateParent(id, request.parentId());
         if (parent != null && !parent.getOrganizationId().equals(entity.getOrganizationId())) {
             throw new BusinessException(ErrorCode.CONFLICT, "不能跨组织移动部门");
@@ -80,16 +99,19 @@ public class DepartmentService {
 
     @Transactional
     public void assignMember(Long departmentId, Long userId) {
-        DepartmentEntity department = requireDepartment(departmentId);
-        UserEntity user = TenantContext.runAs(department.getTenantId(), false, () -> userMapper.selectById(userId));
+        DepartmentEntity department = lockDepartment(departmentId);
+        UserEntity user =
+                TenantContext.runAs(
+                        department.getTenantId(), false, () -> userMapper.selectById(userId));
         if (user == null) throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        requireMovableMember(userId, department.getTenantId(), departmentId);
         departmentMapper.removeUserMembership(userId);
         departmentMapper.addMember(department.getTenantId(), departmentId, userId);
     }
 
     @Transactional
     public void removeMember(Long departmentId, Long userId) {
-        DepartmentEntity department = requireDepartment(departmentId);
+        DepartmentEntity department = lockDepartment(departmentId);
         if (userId.equals(department.getLeaderId())) {
             throw new BusinessException(ErrorCode.CONFLICT, "请先更换部门负责人");
         }
@@ -98,9 +120,11 @@ public class DepartmentService {
 
     @Transactional
     public void delete(Long id) {
-        requireDepartment(id);
-        if (departmentMapper.selectCount(new LambdaQueryWrapper<DepartmentEntity>()
-                .eq(DepartmentEntity::getParentId, id)) > 0) {
+        lockDepartment(id);
+        if (departmentMapper.selectCount(
+                        new LambdaQueryWrapper<DepartmentEntity>()
+                                .eq(DepartmentEntity::getParentId, id))
+                > 0) {
             throw new BusinessException(ErrorCode.CONFLICT, "存在子部门，无法删除");
         }
         if (departmentMapper.countMembers(id) > 0) {
@@ -114,7 +138,7 @@ public class DepartmentService {
         entity.setName(request.name());
         entity.setCode(request.code());
         entity.setLeaderId(request.leaderId());
-        entity.setSort(request.sort() == null ? 0 : request.sort());
+        entity.setSort(java.util.Objects.requireNonNullElse(request.sort(), 0));
         entity.setStatus(request.status() == null ? "active" : request.status());
     }
 
@@ -132,9 +156,24 @@ public class DepartmentService {
         return requireDepartment(parentId);
     }
 
-    private void validateLeader(Long leaderId, Long tenantId) {
-        if (leaderId != null && TenantContext.runAs(tenantId, false, () -> userMapper.selectById(leaderId)) == null) {
+    private void validateLeader(Long leaderId, Long tenantId, Long departmentId) {
+        if (leaderId != null
+                && TenantContext.runAs(tenantId, false, () -> userMapper.selectById(leaderId))
+                        == null) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND, "部门负责人不存在或不属于当前租户");
+        }
+        if (leaderId != null) requireMovableMember(leaderId, tenantId, departmentId);
+    }
+
+    private void requireMovableMember(Long userId, Long tenantId, Long departmentId) {
+        long otherLeaderships =
+                departmentMapper.selectCount(
+                        new LambdaQueryWrapper<DepartmentEntity>()
+                                .eq(DepartmentEntity::getTenantId, tenantId)
+                                .eq(DepartmentEntity::getLeaderId, userId)
+                                .ne(departmentId != null, DepartmentEntity::getId, departmentId));
+        if (otherLeaderships > 0) {
+            throw new BusinessException(ErrorCode.CONFLICT, "请先更换原部门负责人，再调整其部门归属");
         }
     }
 
@@ -146,13 +185,20 @@ public class DepartmentService {
     }
 
     private void validateUniqueCode(String code, Long excludeId, Long tenantId) {
-        LambdaQueryWrapper<DepartmentEntity> query = new LambdaQueryWrapper<DepartmentEntity>()
-                .eq(DepartmentEntity::getTenantId, tenantId)
-                .eq(DepartmentEntity::getCode, code);
+        LambdaQueryWrapper<DepartmentEntity> query =
+                new LambdaQueryWrapper<DepartmentEntity>()
+                        .eq(DepartmentEntity::getTenantId, tenantId)
+                        .eq(DepartmentEntity::getCode, code);
         if (excludeId != null) query.ne(DepartmentEntity::getId, excludeId);
         if (departmentMapper.selectCount(query) > 0) {
             throw new BusinessException(ErrorCode.CONFLICT, "部门编码已存在");
         }
+    }
+
+    private DepartmentEntity lockDepartment(Long id) {
+        DepartmentEntity initial = requireDepartment(id);
+        organizationMapper.lockByTenantId(initial.getTenantId());
+        return requireDepartment(id);
     }
 
     private DepartmentEntity requireDepartment(Long id) {
@@ -161,18 +207,26 @@ public class DepartmentService {
         return value;
     }
 
-    private List<DepartmentVO> buildTree(List<DepartmentEntity> all, Long parentId) {
-        Map<Long, List<DepartmentEntity>> byParent = all.stream()
-                .collect(Collectors.groupingBy(value -> value.getParentId() == null ? 0L : value.getParentId()));
+    private List<DepartmentVO> buildTree(
+            Map<Long, List<DepartmentEntity>> byParent, Long parentId) {
         long key = parentId == null ? 0L : parentId;
         return byParent.getOrDefault(key, List.of()).stream()
-                .sorted(Comparator.comparing(DepartmentEntity::getSort).thenComparing(DepartmentEntity::getId))
-                .map(value -> toVO(value, buildTree(all, value.getId())))
+                .sorted(
+                        Comparator.comparing(DepartmentEntity::getSort)
+                                .thenComparing(DepartmentEntity::getId))
+                .map(value -> toVO(value, buildTree(byParent, value.getId())))
                 .toList();
     }
 
     private DepartmentVO toVO(DepartmentEntity value, List<DepartmentVO> children) {
-        return new DepartmentVO(value.getId(), value.getParentId(), value.getName(), value.getCode(),
-                value.getLeaderId(), value.getSort(), value.getStatus(), children);
+        return new DepartmentVO(
+                value.getId(),
+                value.getParentId(),
+                value.getName(),
+                value.getCode(),
+                value.getLeaderId(),
+                value.getSort(),
+                value.getStatus(),
+                children);
     }
 }

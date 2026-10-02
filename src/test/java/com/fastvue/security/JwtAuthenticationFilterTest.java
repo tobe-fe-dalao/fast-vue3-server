@@ -1,5 +1,15 @@
 package com.fastvue.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import com.fastvue.infrastructure.tenant.TenantContext;
+import com.fastvue.module.tenant.persistence.TenantEntity;
+import com.fastvue.module.tenant.persistence.TenantMapper;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
@@ -11,42 +21,26 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.context.SecurityContextHolder;
-import com.fastvue.infrastructure.tenant.TenantContext;
-import com.fastvue.module.tenant.persistence.TenantEntity;
-import com.fastvue.module.tenant.persistence.TenantMapper;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 /** Regression tests for JWT token-purpose separation. */
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
 
-    @Mock
-    private JwtTokenProvider jwtTokenProvider;
+    @Mock private JwtTokenProvider jwtTokenProvider;
 
-    @Mock
-    private UserDetailsService userDetailsService;
+    @Mock private UserDetailsService userDetailsService;
 
-    @Mock
-    private TenantMapper tenantMapper;
+    @Mock private TenantMapper tenantMapper;
 
-    @Mock
-    private FilterChain filterChain;
+    @Mock private FilterChain filterChain;
 
-    @Mock
-    private Claims claims;
+    @Mock private Claims claims;
 
-    @InjectMocks
-    private JwtAuthenticationFilter filter;
+    @InjectMocks private JwtAuthenticationFilter filter;
 
     @AfterEach
     void clearSecurityContext() {
@@ -74,10 +68,11 @@ class JwtAuthenticationFilterTest {
     void accessTokenAuthenticatesRequest() throws Exception {
         MockHttpServletRequest request = bearerRequest("access-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
-        UserDetails user = User.withUsername("admin")
-                .password("ignored")
-                .authorities("analytics:view")
-                .build();
+        UserDetails user =
+                User.withUsername("admin")
+                        .password("ignored")
+                        .authorities("analytics:view")
+                        .build();
         when(jwtTokenProvider.parse("access-token")).thenReturn(claims);
         when(claims.get("type")).thenReturn("access");
         when(claims.get("tenantId", Long.class)).thenReturn(1L);
@@ -92,12 +87,13 @@ class JwtAuthenticationFilterTest {
 
         assertThat(SecurityContextHolder.getContext().getAuthentication())
                 .isNotNull()
-                .satisfies(authentication -> {
-                    assertThat(authentication.getName()).isEqualTo("admin");
-                    assertThat(authentication.getAuthorities())
-                            .extracting("authority")
-                            .containsExactly("analytics:view");
-                });
+                .satisfies(
+                        authentication -> {
+                            assertThat(authentication.getName()).isEqualTo("admin");
+                            assertThat(authentication.getAuthorities())
+                                    .extracting("authority")
+                                    .containsExactly("analytics:view");
+                        });
         verify(filterChain).doFilter(request, response);
         verify(jwtTokenProvider, never()).parse("refresh-token");
     }
@@ -130,8 +126,15 @@ class JwtAuthenticationFilterTest {
         TenantEntity tenant = new TenantEntity();
         tenant.setId(9L);
         tenant.setStatus("active");
-        LoginUser user = new LoginUser(7L, 9L, "tenant-user", "ignored", true,
-                java.util.List.of("admin"), java.util.List.of());
+        LoginUser user =
+                new LoginUser(
+                        7L,
+                        9L,
+                        "tenant-user",
+                        "ignored",
+                        true,
+                        java.util.List.of("admin"),
+                        java.util.List.of());
         when(jwtTokenProvider.parse("tenant-access-token")).thenReturn(claims);
         when(claims.get("type")).thenReturn("access");
         when(claims.get("tenantId", Long.class)).thenReturn(9L);
@@ -139,14 +142,57 @@ class JwtAuthenticationFilterTest {
         when(claims.getSubject()).thenReturn("7");
         when(tenantMapper.selectById(9L)).thenReturn(tenant);
         when(userDetailsService.loadUserByUsername("tenant-user")).thenReturn(user);
-        doAnswer(invocation -> {
-            assertThat(TenantContext.tenantId()).isEqualTo(9L);
-            assertThat(TenantContext.isSuperAdmin()).isFalse();
-            return null;
-        }).when(filterChain).doFilter(request, response);
+        doAnswer(
+                        invocation -> {
+                            assertThat(TenantContext.tenantId()).isEqualTo(9L);
+                            assertThat(TenantContext.isSuperAdmin()).isFalse();
+                            return null;
+                        })
+                .when(filterChain)
+                .doFilter(request, response);
 
         filter.doFilterInternal(request, response, filterChain);
 
+        assertThat(TenantContext.tenantId()).isNull();
+    }
+
+    @Test
+    void missingUserClearsTenantBeforePublicHandlerRuns() throws Exception {
+        var request = bearerRequest("deleted-user");
+        when(jwtTokenProvider.parse("deleted-user")).thenReturn(claims);
+        when(claims.get("type")).thenReturn("access");
+        when(claims.get("tenantId", Long.class)).thenReturn(9L);
+        when(claims.get("username", String.class)).thenReturn("gone");
+        TenantEntity tenant = new TenantEntity();
+        tenant.setId(9L);
+        tenant.setStatus("active");
+        when(tenantMapper.selectById(9L)).thenReturn(tenant);
+        when(userDetailsService.loadUserByUsername("gone"))
+                .thenThrow(
+                        new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                                "gone"));
+        filter.doFilterInternal(
+                request,
+                new MockHttpServletResponse(),
+                (req, res) -> {
+                    assertThat(TenantContext.tenantId()).isNull();
+                    assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+                });
+        assertThat(TenantContext.tenantId()).isNull();
+    }
+
+    @Test
+    void anonymousDownstreamFailureStillCleansTenant() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () ->
+                                filter.doFilterInternal(
+                                        new MockHttpServletRequest(),
+                                        new MockHttpServletResponse(),
+                                        (req, res) -> {
+                                            TenantContext.set(9L, false);
+                                            throw new jakarta.servlet.ServletException("failure");
+                                        }))
+                .isInstanceOf(jakarta.servlet.ServletException.class);
         assertThat(TenantContext.tenantId()).isNull();
     }
 

@@ -1,11 +1,16 @@
 package com.fastvue.module.role;
 
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.fastvue.module.role.api.RoleVO;
 import com.fastvue.module.role.api.UpdateRoleRequest;
 import com.fastvue.module.role.persistence.RoleEntity;
 import com.fastvue.module.role.persistence.RoleMapper;
 import com.fastvue.module.role.service.RoleConverter;
 import com.fastvue.module.role.service.RoleService;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,25 +18,23 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 class RoleServiceTest {
 
-    @Mock
-    private RoleMapper roleMapper;
-    @Mock
-    private RoleConverter roleConverter;
+    @Mock private RoleMapper roleMapper;
+    @Mock private RoleConverter roleConverter;
 
     private RoleService roleService;
     private RoleEntity role;
 
+    @org.junit.jupiter.api.AfterEach
+    void clear() {
+        com.fastvue.infrastructure.tenant.TenantContext.clear();
+    }
+
     @BeforeEach
     void setUp() {
+        com.fastvue.infrastructure.tenant.TenantContext.set(1L, true);
         roleService = new RoleService(roleMapper, roleConverter);
         role = new RoleEntity();
         role.setId(2L);
@@ -39,8 +42,8 @@ class RoleServiceTest {
         role.setName("运营");
 
         when(roleMapper.selectById(2L)).thenReturn(role);
-        when(roleConverter.toVO(role)).thenReturn(
-                new RoleVO(2L, "operator", "运营", null, null, null, null, null));
+        when(roleConverter.toVO(role))
+                .thenReturn(new RoleVO(2L, "operator", "运营", null, null, null, null, null));
         when(roleMapper.selectPermissionCodes(2L)).thenReturn(List.of("user:list"));
         when(roleMapper.selectMenuIds(2L)).thenReturn(List.of(1L));
     }

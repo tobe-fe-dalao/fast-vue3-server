@@ -1,18 +1,28 @@
 package com.fastvue.module.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.fastvue.common.exception.BusinessException;
 import com.fastvue.common.exception.ErrorCode;
 import com.fastvue.module.auth.api.LoginRequest;
 import com.fastvue.module.auth.api.RefreshTokenRequest;
 import com.fastvue.module.auth.api.TokenResponse;
 import com.fastvue.module.auth.service.AuthService;
+import com.fastvue.module.tenant.persistence.TenantEntity;
+import com.fastvue.module.tenant.service.TenantService;
 import com.fastvue.module.user.persistence.UserEntity;
 import com.fastvue.module.user.persistence.UserMapper;
 import com.fastvue.security.JwtTokenProvider;
 import com.fastvue.security.RefreshTokenStore;
-import com.fastvue.module.tenant.service.TenantService;
-import com.fastvue.module.tenant.persistence.TenantEntity;
 import io.jsonwebtoken.Claims;
+import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,36 +34,19 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
-import java.time.Duration;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.when;
-
 /**
  * AuthService 单元测试（Mockito，无需数据库 / Redis）。
  */
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
-    @Mock
-    private AuthenticationManager authenticationManager;
-    @Mock
-    private JwtTokenProvider jwtTokenProvider;
-    @Mock
-    private RefreshTokenStore refreshTokenStore;
-    @Mock
-    private UserMapper userMapper;
-    @Mock
-    private TenantService tenantService;
+    @Mock private AuthenticationManager authenticationManager;
+    @Mock private JwtTokenProvider jwtTokenProvider;
+    @Mock private RefreshTokenStore refreshTokenStore;
+    @Mock private UserMapper userMapper;
+    @Mock private TenantService tenantService;
 
-    @InjectMocks
-    private AuthService authService;
+    @InjectMocks private AuthService authService;
 
     private final UserEntity admin = new UserEntity();
 

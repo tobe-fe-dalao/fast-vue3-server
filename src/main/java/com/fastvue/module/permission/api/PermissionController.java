@@ -5,6 +5,7 @@ import com.fastvue.module.permission.service.PermissionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -15,8 +16,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * 权限管理接口。
@@ -46,7 +45,8 @@ public class PermissionController {
     @Operation(summary = "更新权限")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('admin') and hasAuthority('role:update')")
-    public ApiResponse<PermissionVO> update(@PathVariable Long id, @Valid @RequestBody PermissionRequest request) {
+    public ApiResponse<PermissionVO> update(
+            @PathVariable Long id, @Valid @RequestBody PermissionRequest request) {
         return ApiResponse.success(permissionService.update(id, request));
     }
 

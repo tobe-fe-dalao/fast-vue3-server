@@ -1,13 +1,12 @@
 package com.fastvue.module.role.persistence;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import java.util.List;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-
-import java.util.List;
 
 /**
  * 角色数据访问。
@@ -15,7 +14,8 @@ import java.util.List;
 @Mapper
 public interface RoleMapper extends BaseMapper<RoleEntity> {
 
-    @Select("""
+    @Select(
+            """
             SELECT p.code
             FROM sys_permission p
             JOIN sys_role_permission rp ON rp.permission_id = p.id
@@ -23,14 +23,16 @@ public interface RoleMapper extends BaseMapper<RoleEntity> {
             """)
     List<String> selectPermissionCodes(@Param("roleId") Long roleId);
 
-    @Select("""
+    @Select(
+            """
             SELECT menu_id
             FROM sys_role_menu
             WHERE role_id = #{roleId}
             """)
     List<Long> selectMenuIds(@Param("roleId") Long roleId);
 
-    @Select("""
+    @Select(
+            """
             <script>
             SELECT rp.role_id, p.code FROM sys_role_permission rp
             JOIN sys_permission p ON p.id = rp.permission_id
@@ -42,7 +44,8 @@ public interface RoleMapper extends BaseMapper<RoleEntity> {
             """)
     List<RolePermissionRow> selectPermissionRows(@Param("roleIds") List<Long> roleIds);
 
-    @Select("""
+    @Select(
+            """
             <script>
             SELECT role_id, menu_id FROM sys_role_menu WHERE role_id IN
             <foreach collection="roleIds" item="id" open="(" separator="," close=")">#{id}</foreach>
@@ -57,7 +60,8 @@ public interface RoleMapper extends BaseMapper<RoleEntity> {
     @Delete("DELETE FROM sys_role_menu WHERE role_id = #{roleId}")
     void deleteRoleMenus(@Param("roleId") Long roleId);
 
-    @Insert("""
+    @Insert(
+            """
             <script>
             INSERT INTO sys_role_permission (tenant_id, role_id, permission_id) VALUES
             <foreach collection="permissionIds" item="permissionId" separator=",">
@@ -65,10 +69,13 @@ public interface RoleMapper extends BaseMapper<RoleEntity> {
             </foreach>
             </script>
             """)
-    void insertRolePermissions(@Param("tenantId") Long tenantId, @Param("roleId") Long roleId,
-                               @Param("permissionIds") List<Long> permissionIds);
+    void insertRolePermissions(
+            @Param("tenantId") Long tenantId,
+            @Param("roleId") Long roleId,
+            @Param("permissionIds") List<Long> permissionIds);
 
-    @Insert("""
+    @Insert(
+            """
             <script>
             INSERT INTO sys_role_menu (tenant_id, role_id, menu_id) VALUES
             <foreach collection="menuIds" item="menuId" separator=",">
@@ -76,9 +83,21 @@ public interface RoleMapper extends BaseMapper<RoleEntity> {
             </foreach>
             </script>
             """)
-    void insertRoleMenus(@Param("tenantId") Long tenantId, @Param("roleId") Long roleId,
-                         @Param("menuIds") List<Long> menuIds);
+    void insertRoleMenus(
+            @Param("tenantId") Long tenantId,
+            @Param("roleId") Long roleId,
+            @Param("menuIds") List<Long> menuIds);
+
+    @Select(
+            """
+            <script>
+            SELECT code FROM sys_permission WHERE deleted = false AND id IN
+            <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+            </script>
+            """)
+    List<String> selectPermissionCodesByIds(@Param("ids") List<Long> ids);
 
     record RolePermissionRow(Long roleId, String code) {}
+
     record RoleMenuRow(Long roleId, Long menuId) {}
 }

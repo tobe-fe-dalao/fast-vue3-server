@@ -2,17 +2,40 @@ spring:
   application:
     name: fast-vue3-server
   profiles:
-    active: dev
+    default: dev
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  datasource:
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN:2}
+      connection-timeout: 5000
+      validation-timeout: 2000
+      max-lifetime: 1800000
+      connection-init-sql: "SET statement_timeout = '${app.database.statement-timeout-seconds}s'; SET lock_timeout = '${app.database.lock-timeout-millis}ms'"
+  transaction:
+    default-timeout: ${app.database.transaction-timeout-seconds}s
+  jdbc:
+    template:
+      query-timeout: ${app.database.statement-timeout-seconds}s
+  data:
+    redis:
+      connect-timeout: 2s
+      timeout: 2s
+      password: ${REDIS_PASSWORD:}
+      repositories:
+        enabled: false
   jackson:
     default-property-inclusion: non_null
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
+      max-file-size: ${app.storage.max-size-bytes}B
+      max-request-size: ${FILE_MAX_REQUEST_SIZE_BYTES:11534336}B
 
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
+    default-statement-timeout: ${app.database.statement-timeout-seconds}
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
   global-config:
     db-config:
@@ -20,11 +43,30 @@ mybatis-plus:
       logic-delete-value: true
       logic-not-delete-value: false
 
+server:
+  tomcat:
+    max-swallow-size: ${spring.servlet.multipart.max-request-size}
+  shutdown: graceful
+  forward-headers-strategy: none
+
 app:
+  notifications:
+    delivery-enabled: ${NOTIFICATION_DELIVERY_ENABLED:true}
+    poll-interval-ms: ${NOTIFICATION_POLL_INTERVAL_MS:5000}
+    batch-size: ${NOTIFICATION_BATCH_SIZE:20}
+    max-attempts: ${NOTIFICATION_MAX_ATTEMPTS:10}
+  database:
+    statement-timeout-seconds: ${DB_STATEMENT_TIMEOUT_SECONDS:15}
+    transaction-timeout-seconds: ${DB_TRANSACTION_TIMEOUT_SECONDS:20}
+    lock-timeout-millis: ${DB_LOCK_TIMEOUT_MILLIS:5000}
+  demo:
+    enabled: false
   jwt:
-    secret: ${JWT_SECRET:change-me-to-a-random-secret-at-least-32-bytes-long}
-    access-token-ttl: 7200        # Access Token 有效期（秒）
-    refresh-token-ttl: 604800     # Refresh Token 有效期（秒，7 天）
+    secret: ${JWT_SECRET}
+    issuer: fast-vue3-server
+    audience: fast-vue3
+    access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:900}        # Access Token 有效期（秒）
+    refresh-token-ttl: ${JWT_REFRESH_TOKEN_TTL:604800}     # Refresh Token 有效期（秒，7 天）
   admin:
     password: ${ADMIN_PASSWORD:}
     default-dev-password: admin123  # 仅供 dev 环境、且未配置 ADMIN_PASSWORD 时使用
@@ -43,6 +85,13 @@ management:
   endpoint:
     health:
       show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db,redis
+        liveness:
+          include: livenessState
   metrics:
     tags:
       application: ${spring.application.name}

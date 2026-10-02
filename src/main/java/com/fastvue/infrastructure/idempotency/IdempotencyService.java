@@ -3,48 +3,39 @@ package com.fastvue.infrastructure.idempotency;
 import com.fastvue.common.exception.BusinessException;
 import com.fastvue.common.exception.ErrorCode;
 import com.fastvue.infrastructure.tenant.TenantContext;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
-
-import java.time.Duration;
+import com.fastvue.security.SecurityUtils;
 import java.util.function.Supplier;
+import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-/** Redis-backed request claim used only for non-repeatable business commands. */
+/** The claim and business command commit together; rollback releases the claim. */
 @Service
-@Slf4j
 @RequiredArgsConstructor
 public class IdempotencyService {
-    private final StringRedisTemplate redisTemplate;
+    private final JdbcTemplate jdbc;
 
-    public <T> T execute(String operation, String idempotencyKey, Supplier<T> action) {
-        if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 128) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Idempotency-Key 必填且不能超过 128 字符");
+    @Transactional
+    public <T> T execute(String operation, String key, Supplier<T> action) {
+        if (key == null || !key.matches("[\\x21-\\x7E]{1,128}")) {
+            throw new BusinessException(
+                    ErrorCode.VALIDATION_ERROR, "Idempotency-Key 必须是 1-128 位可见 ASCII 字符");
         }
-        String redisKey = "idempotency:" + TenantContext.tenantId() + ":" + operation + ":" + idempotencyKey;
-        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(redisKey, "processing", Duration.ofHours(24));
-        if (!Boolean.TRUE.equals(acquired)) {
-            throw new BusinessException(ErrorCode.IDEMPOTENCY_CONFLICT);
-        }
-        T result;
-        try {
-            result = action.get();
-        } catch (RuntimeException ex) {
-            try {
-                redisTemplate.delete(redisKey);
-            } catch (RuntimeException cleanupFailure) {
-                log.warn("幂等声明清理失败 key={}: {}", redisKey, cleanupFailure.getMessage());
-            }
-            throw ex;
-        }
-        try {
-            redisTemplate.opsForValue().set(redisKey, "completed", Duration.ofHours(24));
-        } catch (RuntimeException ex) {
-            // The command may have committed already; a Redis write failure cannot turn it
-            // into a safe-to-retry failure response.
-            log.warn("业务已完成但幂等结果标记失败 key={}: {}", redisKey, ex.getMessage());
-        }
-        return result;
+        Long tenantId = TenantContext.tenantId();
+        Long userId = SecurityUtils.currentUserIdOrNull();
+        if (tenantId == null || userId == null) throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        int claimed =
+                jdbc.update(
+                        """
+                INSERT INTO sys_idempotency (tenant_id, user_id, operation, request_key)
+                VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING
+                """,
+                        tenantId,
+                        userId,
+                        operation,
+                        key);
+        if (claimed == 0) throw new BusinessException(ErrorCode.IDEMPOTENCY_CONFLICT);
+        return action.get();
     }
 }

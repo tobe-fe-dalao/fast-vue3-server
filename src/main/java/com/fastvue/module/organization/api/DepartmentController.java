@@ -3,11 +3,10 @@ package com.fastvue.module.organization.api;
 import com.fastvue.common.response.ApiResponse;
 import com.fastvue.module.organization.service.DepartmentService;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/departments")
@@ -29,14 +28,15 @@ public class DepartmentController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('department:manage')")
-    public ApiResponse<DepartmentModels.DepartmentVO> create(@Valid @RequestBody DepartmentModels.SaveRequest request) {
+    public ApiResponse<DepartmentModels.DepartmentVO> create(
+            @Valid @RequestBody DepartmentModels.SaveRequest request) {
         return ApiResponse.success(departmentService.create(request));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('department:manage')")
-    public ApiResponse<DepartmentModels.DepartmentVO> update(@PathVariable Long id,
-            @Valid @RequestBody DepartmentModels.SaveRequest request) {
+    public ApiResponse<DepartmentModels.DepartmentVO> update(
+            @PathVariable Long id, @Valid @RequestBody DepartmentModels.SaveRequest request) {
         return ApiResponse.success(departmentService.update(id, request));
     }
 

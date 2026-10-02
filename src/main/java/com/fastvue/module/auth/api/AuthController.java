@@ -2,10 +2,10 @@ package com.fastvue.module.auth.api;
 
 import com.fastvue.common.response.ApiResponse;
 import com.fastvue.module.auth.service.AuthService;
-import com.fastvue.module.user.api.CreateUserRequest;
-import com.fastvue.module.user.service.UserService;
-import com.fastvue.module.user.api.UserVO;
 import com.fastvue.module.tenant.service.TenantService;
+import com.fastvue.module.user.api.CreateUserRequest;
+import com.fastvue.module.user.api.UserVO;
+import com.fastvue.module.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -38,9 +38,16 @@ public class AuthController {
     @Operation(summary = "注册")
     @PostMapping("/register")
     public ApiResponse<UserVO> register(@Valid @RequestBody RegisterRequest request) {
-        CreateUserRequest createRequest = new CreateUserRequest(
-                request.username(), request.password(), request.username(), request.email(), null);
-        return ApiResponse.success(tenantService.inTenant(request.tenantCode(), () -> userService.create(createRequest)));
+        CreateUserRequest createRequest =
+                new CreateUserRequest(
+                        request.username(),
+                        request.password(),
+                        request.username(),
+                        request.email(),
+                        null);
+        return ApiResponse.success(
+                tenantService.inTenant(
+                        request.tenantCode(), () -> userService.create(createRequest)));
     }
 
     @Operation(summary = "刷新令牌")

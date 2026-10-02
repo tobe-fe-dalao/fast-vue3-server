@@ -1,258 +1,75 @@
 # fast-vue3-server
 
-**Languages:** English | [简体中文](./README.zh-CN.md) | [繁體中文（台灣）](./README.zh-TW.md) | [繁體中文（香港）](./README.zh-HK.md) | [日本語](./README.ja.md)
+[English](./README.md) · [简体中文](./README.zh-CN.md) · [繁體中文（台灣）](./README.zh-TW.md) · [繁體中文（香港）](./README.zh-HK.md) · [日本語](./README.ja.md)
 
-The official Spring Boot reference backend for [fast-vue3](https://github.com/tobe-fe-dalao/fast-vue3). It is a Java 21 modular monolith that provides one `/api/v1` contract for all admin and site applications.
+Official Java backend for Fast Vue3, using a shared `/api/v1` contract.
 
-Documentation: <https://tobe-fe-dalao.github.io/fast-vue3-site/en/server/>
+Java 21, Spring Boot 3.5.16, Spring MVC/Security, MyBatis-Plus, PostgreSQL 16, Redis 7, Flyway, JUnit 5 and Testcontainers. Modules stay in `module/<domain>/{api,service,persistence}`; controllers expose DTOs and services own transactions.
 
-## Stack
+[Documentation](https://tobe-fe-dalao.github.io/fast-vue3-site/en/server/) · [Configuration](https://tobe-fe-dalao.github.io/fast-vue3-site/en/server/guide/configuration) · [API contracts](https://tobe-fe-dalao.github.io/fast-vue3-site/en/server/api/contracts)
 
-- Spring Boot 3 / Spring MVC / Spring Security
-- JWT access and refresh tokens
-- MyBatis-Plus and PostgreSQL
-- Redis refresh-token storage, permission cache, rate limiting, and idempotency
-- Flyway migrations
-- Springdoc OpenAPI
-- JUnit 5, MockMvc, and Testcontainers
-
-## Modules
-
-```text
-com.fastvue
-├── common          # Response envelope, errors, exception handling
-├── config          # Persistence, OpenAPI, initialization
-├── infrastructure  # Audit fields and entity base
-├── security        # JWT and Spring Security
-└── module
-    ├── auth, user, role, permission, menu
-    ├── tenant, organization, project, task
-    ├── approval, notification, audit
-    ├── content, analytics, portal
-    └── site        # Blog comments and payment checkout
-```
-
-## Architecture
-
-The application is deployed as one Spring Boot process, while business capabilities remain isolated as vertical modules. HTTP APIs depend on services; services own authorization, transactions, and state transitions; mappers own persistence. PostgreSQL is the source of truth and Redis is used only where short-lived coordination or high-frequency reads justify it.
-
-```mermaid
-flowchart LR
-    Client[fast-vue3 clients] --> Security[JWT + RBAC + rate limit]
-    Security --> API[Module APIs]
-    API --> Domain[Application/domain services]
-    Domain --> Mapper[MyBatis-Plus + handwritten SQL]
-    Mapper --> PG[(PostgreSQL)]
-    Domain --> Redis[(Redis)]
-    Domain --> Events[After-commit events]
-    Events --> Notify[Notification / activity]
-    API --> Metrics[Actuator + Prometheus]
-```
-
-### Module design
-
-- `tenant` and `organization` establish the enterprise boundary and department tree.
-- `project` and `task` demonstrate membership access, business state, comments, activity history, soft archival, and optimistic locking.
-- `approval` is a deliberately small state machine, not a BPMN engine.
-- `notification` consumes in-process events only after the database transaction commits.
-- `audit` stores request metadata separately from project/task business activity.
-- `infrastructure` contains tenant enforcement, idempotency, metrics, request correlation, and file-storage abstractions.
-
-## Multi-tenant architecture
-
-`tenantId` is loaded from the signed access token into `TenantContext`. A MyBatis tenant interceptor automatically appends tenant predicates to protected tables and supplies the tenant column on inserts. Ordinary tenant administrators cannot disable this rule. Only the bootstrap system administrator (user 1 in the default tenant, with the `admin` role) enters the explicit cross-tenant path. Anonymous `/api/v1/public/**` requests resolve the tenant from `X-Tenant-Code` (default: `default`), so public tenant data follows the same boundary.
-
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant J as JWT filter
-    participant T as TenantContext
-    participant M as MyBatis interceptor
-    participant D as PostgreSQL
-    C->>J: request + access token
-    J->>T: tenantId, roles, permissions
-    T->>M: current tenant boundary
-    M->>D: SELECT ... WHERE id=? AND tenant_id=?
-    D-->>M: tenant-local row or empty
-    M-->>C: resource or tenant-safe 404
-```
-
-Tenant-scoped unique constraints include `(tenant_id, username)`, `(tenant_id, role code)`, `(tenant_id, department code)`, and `(tenant_id, project code)`. The Testcontainers suite proves that changing a URL ID cannot read another tenant's user.
-
-## Project and task domain
-
-Project access requires membership (except the system super administrator). The creator becomes owner and member atomically. Archived projects reject new tasks and membership changes. Task assignees must already belong to the project. Project removal is represented by archival rather than physical deletion.
-
-```mermaid
-stateDiagram-v2
-    [*] --> TODO
-    TODO --> IN_PROGRESS
-    TODO --> CANCELLED
-    IN_PROGRESS --> BLOCKED
-    IN_PROGRESS --> DONE
-    IN_PROGRESS --> CANCELLED
-    BLOCKED --> IN_PROGRESS
-    BLOCKED --> CANCELLED
-    DONE --> [*]
-    CANCELLED --> [*]
-```
-
-Each task activity records actor, time, action, field, previous value, and new value. Completed or cancelled tasks cannot be reopened or have critical fields silently rewritten.
-
-## Approval workflow
-
-Approval requests use explicit `DRAFT`, `PENDING`, `APPROVED`, `REJECTED`, and `CANCELLED` states. The reference budget flow creates a department-manager step followed by an administrator step. Controllers never manipulate state directly.
-
-```mermaid
-sequenceDiagram
-    participant U as Applicant
-    participant S as ApprovalService
-    participant M as Department manager
-    participant A as Administrator
-    participant N as After-commit notification
-    U->>S: create draft
-    U->>S: submit + Idempotency-Key
-    S-->>M: pending step
-    M->>S: approve
-    S-->>A: pending step
-    A->>S: approve or reject
-    S-->>N: publish only after commit
-    N-->>U: final result
-```
-
-Illegal transitions such as `APPROVED -> PENDING` and `REJECTED -> APPROVED` return HTTP 409.
-
-## Transaction, concurrency, and idempotency
-
-- Project/task changes and their activity rows share one transaction.
-- Project, task, and approval aggregates carry a `version`; stale updates return HTTP 409 instead of overwriting newer data.
-- `POST /api/v1/projects` and `POST /api/v1/approvals/{id}/submit` require `Idempotency-Key` and claim it atomically in Redis for 24 hours.
-- Application events are handled with `@TransactionalEventListener(AFTER_COMMIT)`, so rolled-back writes do not send notifications.
-
-## Security
-
-- JWT access and refresh tokens have distinct purposes; refresh tokens cannot authenticate API requests and are atomically rotated in Redis.
-- DTOs whitelist mutable fields; entities are never accepted as request bodies.
-- Tenant predicates plus project membership checks defend against IDOR and tenant escape.
-- File storage uses tenant directories, generated names, normalized paths, size/MIME/extension/signature checks, and an abstraction suitable for future S3/OSS/MinIO adapters.
-- Operation audit never stores request bodies, passwords, access tokens, or refresh tokens.
-- Production must supply JWT/admin/database secrets, restrictive CORS settings, TLS/reverse proxying, Redis authentication/network controls, backups, and an external object store when local disk is not durable.
-- The `prod` profile requires `JWT_SECRET` and `ADMIN_PASSWORD` at startup; the bundled Compose profile uses development settings only.
-
-## Observability
-
-Every API response includes `X-Request-Id`; request logs capture `requestId`, `tenantId`, and `userId`. Actuator exposes health and authenticated metrics/Prometheus endpoints. Standard HTTP/server/Hikari metrics are complemented by:
-
-- `project_created_total`
-- `task_created_total`
-- `approval_submitted_total`
-- `approval_rejected_total`
-
-Prometheus endpoint: `GET /actuator/prometheus`.
-
-## Run locally
-
-For local Java development, install JDK 21 and Docker.
+## Development
 
 ```bash
-cp .env.example .env # first run only
+cp .env.example .env
+docker compose --profile app up -d --build
+```
+
+Java 21:
+
+```bash
 docker compose up -d
+set -a
+source .env
+set +a
 ./mvnw spring-boot:run
 ```
 
-Without a local JDK, run everything with Docker Desktop or OrbStack. Both expose the same Docker Compose CLI:
-
-```bash
-docker compose --profile app up -d --build
-docker compose ps
-docker compose logs -f app
-```
-
-- API: `http://localhost:8080`
+- API: `http://localhost:8080/api/v1`
 - Health: `http://localhost:8080/actuator/health`
-- Swagger UI (switches both UI controls and API content between Chinese, Japanese, and English): `http://localhost:8080/swagger-ui.html`
-- Direct language selection: `/api-docs-ui/index.html?lang=zh-CN`, `?lang=ja-JP`, or `?lang=en-US`
-- OpenAPI JSON: `http://localhost:8080/v3/api-docs/zh-CN`, `/ja-JP`, or `/en-US`
-- Development login: `admin / admin123`
+- Swagger: `http://localhost:8080/swagger-ui.html` (development)
+- Development only: `admin / admin123`
 
-## Connect fast-vue3
+## Build and test
 
 ```bash
-cd /Users/fong/Workspace/personal/frontend/vue/fast-vue3/fast-vue3
-VITE_DEV_BACKEND=server pnpm dev:web-antd
-# or
-VITE_DEV_BACKEND=server pnpm dev:site-antd
-```
-
-The frontend keeps `/api/v1` as its base path; shared Vite configuration proxies it to this server.
-
-## Response contract
-
-```json
-{ "code": 0, "message": "success", "data": {} }
-```
-
-Pagination uses:
-
-```json
-{ "items": [], "page": 1, "pageSize": 20, "total": 0 }
-```
-
-## Authentication boundary
-
-Public authentication endpoints:
-
-- `POST /api/v1/auth/login`
-- `POST /api/v1/auth/register`
-- `POST /api/v1/auth/refresh`
-
-Login and registration accept an optional `tenantCode`; new tenants are provisioned by the system administrator with an organization, isolated tenant-admin role, role grants, menus, and an initial administrator account.
-
-Public site content:
-
-- `GET /api/v1/public/home|product|features|about|docs|faq|pricing`
-- `GET /api/v1/public/blog`
-- `GET /api/v1/public/blog/{id}`
-- `GET /api/v1/public/blog/{id}/comments`
-- `POST /api/v1/public/contact`
-
-Authenticated site interactions:
-
-- `POST /api/v1/blog/{id}/comments`
-- `POST /api/v1/payments/checkout`
-
-All management and content-management endpoints require an access token, followed by method-level RBAC checks where applicable.
-
-Operating-data endpoints additionally require `analytics:view` or `data:view`. `GET /api/v1/menus` intentionally needs only login because it returns the current user's own navigation; the management tree and menu CRUD retain `menu:*` permissions. Public handlers do not call the throwing `SecurityUtils.currentUser()` API.
-
-## Payment design
-
-Checkout accepts a payable `planId` and `channel` (`alipay`, `wechat`, or `card`), persists a pending order, and returns an order number, amount, expiry time, and `checkoutUrl`. The bundled adapter never charges real money. A production integration should replace the demo URL with a provider session and verify signed, idempotent callbacks before marking an order paid.
-
-## Persistence
-
-Flyway owns the schema. `V7__site_interactions.sql` adds `site_blog_comment` and `site_payment_order`. Both tables record the authenticated user and common audit fields.
-
-## Tests
-
-```bash
+./mvnw spotless:apply
+./mvnw spotless:check checkstyle:check
+./mvnw -DskipTests test-compile pmd:check spotbugs:check
 ./mvnw test
-```
-
-- Unit tests cover authentication, RBAC, project rules, task state transitions, optimistic locking, approval state, idempotency, and project access.
-- MockMvc tests verify response contracts and anonymous/authenticated boundaries.
-- Testcontainers runs all Flyway migrations against PostgreSQL and proves cross-tenant isolation when Docker is available.
-
-For the full release-quality lifecycle:
-
-```bash
 ./mvnw clean verify
 ```
 
-## Documentation
+Tool responsibilities: Spotless 3.10.4 uses google-java-format 1.28.0 with AOSP four-space formatting and import cleanup; Checkstyle retains the project’s basic conventions; Maven PMD 3.28.0 (PMD 7.17.0) analyzes production and test resources, unused code and cognitive complexity (method threshold 25); SpotBugs 4.10.5.0 analyzes production bytecode at its default confidence threshold; Error Prone 2.43.0 enforces the 21 configured error checks during Java 21 compilation alongside Lombok/MapStruct.
 
-Architecture, setup, configuration, testing, and API reference documentation is maintained centrally in [fast-vue3-site](https://tobe-fe-dalao.github.io/fast-vue3-site/en/server/). This repository intentionally keeps only concise operational guidance in its README and does not include a Node.js/VitePress toolchain.
+`validate` checks formatting and Checkstyle; production/test compilation runs Error Prone; `verify` runs PMD/SpotBugs. Builds never rewrite sources: run `spotless:apply` explicitly. Static checks do not require Docker and exclude generated code. Rules live in `config/`; CI archives `target/checkstyle-result.xml`, `target/pmd.xml`, and `target/spotbugsXml.xml`.
 
-## License
+Exclusions are limited to named types, methods and patterns: existing passive request/response collection ownership is preserved for the listed DTOs; shared Spring constructor dependencies, validated request-ID headers and conditional CORS defensive copies have individual explanations. PMD recognizes executor shutdown in `finally`; only the Mockito JDBC fixture suppresses resource-close warnings locally. Null, resource and other bug detection remain active elsewhere.
 
-[MIT](./LICENSE)
+`test-compile` checks production and test types without executing tests. Compilation fails on unchecked conversions, raw types, deprecated API warnings and unmapped MapStruct target fields. `test` runs JUnit/Mockito/MockMvc without Docker. `clean verify` additionally runs PostgreSQL/Redis integration tests through Failsafe and packages the executable jar; Docker is required and missing infrastructure fails verification instead of silently skipping tests. JaCoCo writes combined coverage to `target/site/jacoco/index.html` and `jacoco.xml`. Local checks do not establish remote CI results.
+
+## Production
+
+Production uses the independent `compose.prod.yml`. Do not merge it with the development Compose file. Fill every required secret in a private `.env.prod` or inject it from a secret manager. Use a random JWT secret of at least 32 bytes and a bootstrap password of at least 12 characters, at most 72 UTF-8 bytes. CORS accepts explicit HTTPS origins only. Startup rejects development profiles, placeholder secrets and demo adapters.
+
+```bash
+cp .env.prod.example .env.prod
+# Supply required secrets and explicit HTTPS origins before running.
+docker compose --env-file .env.prod -f compose.prod.yml up -d --build
+```
+
+Health and liveness/readiness are public without infrastructure details. Readiness checks PostgreSQL and Redis; liveness checks application state only. Metrics and Prometheus require `audit:view`. Production logs use ECS JSON with request ID, tenant/user context and HTTP latency. Sensitive headers and request bodies are not logged. Trace export is not configured; there is no claim of full OpenTelemetry tracing.
+
+Production disables demo dashboard/analytics/portal fixtures and returns 503 for demonstration payment checkout without writing an order. A real payment provider, signed callbacks, ledger and payment idempotency require business integration; this checkout cannot accept real money.
+
+## Runtime budgets and notification recovery
+
+- Lock waits default to 5 seconds, SQL to 15 seconds and transactions to 20 seconds. Configure `DB_LOCK_TIMEOUT_MILLIS`, `DB_STATEMENT_TIMEOUT_SECONDS`, `DB_TRANSACTION_TIMEOUT_SECONDS`; startup validates that order. A transaction timeout bounds database work, not the entire HTTP request.
+- Storage and Servlet share `FILE_MAX_SIZE_BYTES` (10 MiB). `FILE_MAX_REQUEST_SIZE_BYTES` defaults to 11 MiB and must allow at least 64 KiB of multipart overhead. Tomcat uses the same finite request budget to drain rejected uploads so clients can read 413 within that budget. Missing `file` returns 400; oversized uploads return 413.
+- ID collections accept up to 1000 non-null IDs; duplicate role grants are normalized. Articles accept up to 1000 paragraphs of 10000 characters and 100 tags of 64 characters. Omitted update collections retain their values; empty arrays clear them.
+- Notifications enter a PostgreSQL outbox in the business transaction, with an immediate delivery attempt after commit. Background polling defaults to 20 rows every 5 seconds. Notification insertion and acknowledgement commit atomically; row locks coordinate instances. Failures back off exponentially from 5 seconds to at most 1 hour and become `FAILED` after 10 attempts. Configure `NOTIFICATION_BATCH_SIZE`, `NOTIFICATION_MAX_ATTEMPTS`, `NOTIFICATION_POLL_INTERVAL_MS`.
+- Inspect `sys_notification_outbox.status/attempts/last_error` (exception class only). After resolving the cause, requeue a specific failed UUID by setting `status='PENDING', attempts=0, next_attempt_at=now(), last_error=NULL` with `WHERE id=? AND status='FAILED'`. Never replay delivered rows. Retain/purge delivered history according to operational policy; preserve unfinished rows.
+- V12 adds live category-name uniqueness per tenant. Before deployment, run `SELECT tenant_id,name,count(*) FROM content_category WHERE NOT deleted GROUP BY tenant_id,name HAVING count(*) > 1;` and resolve duplicates with the business owner. Migration fails rather than renaming or deleting data. V13 adds the notification outbox.
+- `clean verify` requires at least 90% line / 70% branch coverage per article, category, menu, rate-limit and notification-dispatch service class; the department service requires 85% / 70%. Other modules remain reported while coverage gates expand incrementally.
+
+[Architecture and enterprise API](https://tobe-fe-dalao.github.io/fast-vue3-site/en/server/api/enterprise): thin Controller → Service → MyBatis Mapper; DTO/persistence boundaries, tenant isolation, resource ownership, service transactions, optimistic locking and durable command idempotency. Schema changes are append-only Flyway migrations. Shared API changes must include frontend clients, Nitro mock and tests. Do not commit credentials or generated files.

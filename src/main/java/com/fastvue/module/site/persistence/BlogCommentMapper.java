@@ -5,5 +5,4 @@ import org.apache.ibatis.annotations.Mapper;
 
 /** Blog comment data access. */
 @Mapper
-public interface BlogCommentMapper extends BaseMapper<BlogCommentEntity> {
-}
+public interface BlogCommentMapper extends BaseMapper<BlogCommentEntity> {}

@@ -1,5 +1,7 @@
 package com.fastvue.module.organization.persistence;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fastvue.infrastructure.persistence.BaseEntity;
 import lombok.Getter;
@@ -11,10 +13,16 @@ import lombok.Setter;
 public class DepartmentEntity extends BaseEntity {
     private Long tenantId;
     private Long organizationId;
+
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Long parentId;
+
     private String name;
     private String code;
+
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Long leaderId;
+
     private Integer sort;
     private String status;
 }
