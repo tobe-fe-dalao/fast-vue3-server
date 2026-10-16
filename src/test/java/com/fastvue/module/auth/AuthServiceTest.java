@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fastvue.common.exception.BusinessException;
@@ -20,6 +21,7 @@ import com.fastvue.module.tenant.service.TenantService;
 import com.fastvue.module.user.persistence.UserEntity;
 import com.fastvue.module.user.persistence.UserMapper;
 import com.fastvue.security.JwtTokenProvider;
+import com.fastvue.security.LoginUser;
 import com.fastvue.security.RefreshTokenStore;
 import io.jsonwebtoken.Claims;
 import java.time.Duration;
@@ -64,7 +66,13 @@ class AuthServiceTest {
         TenantEntity tenant = new TenantEntity();
         tenant.setId(1L);
         when(tenantService.requireActive("default")).thenReturn(tenant);
-        when(userMapper.selectOne(any())).thenReturn(admin);
+        var principal =
+                new LoginUser(
+                        1L, 1L, "admin", "hashed", true, java.util.List.of(), java.util.List.of());
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenReturn(
+                        new UsernamePasswordAuthenticationToken(
+                                principal, null, principal.getAuthorities()));
         when(jwtTokenProvider.generateAccessToken(1L, "admin")).thenReturn("access-token");
         when(jwtTokenProvider.generateRefreshToken(1L, "admin"))
                 .thenReturn(new JwtTokenProvider.TokenPair("jti-1", "refresh-token"));
@@ -77,6 +85,7 @@ class AuthServiceTest {
         assertThat(response.refreshToken()).isEqualTo("refresh-token");
         assertThat(response.expiresIn()).isEqualTo(7200L);
         verify(refreshTokenStore).save(anyLong(), anyString(), anyString(), any(Duration.class));
+        verifyNoInteractions(userMapper);
     }
 
     @Test
@@ -92,6 +101,43 @@ class AuthServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_USERNAME_OR_PASSWORD);
+    }
+
+    @Test
+    void loginRejectsAnUnexpectedAuthenticationPrincipalWithoutIssuingTokens() {
+        TenantEntity tenant = new TenantEntity();
+        tenant.setId(1L);
+        when(tenantService.requireActive("default")).thenReturn(tenant);
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenReturn(
+                        new UsernamePasswordAuthenticationToken(
+                                "unexpected", null, java.util.List.of()));
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("admin", "password")))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INTERNAL_ERROR);
+        verifyNoInteractions(userMapper, jwtTokenProvider, refreshTokenStore);
+    }
+
+    @Test
+    void loginRejectsAnAuthenticationPrincipalFromAnotherTenant() {
+        TenantEntity tenant = new TenantEntity();
+        tenant.setId(1L);
+        when(tenantService.requireActive("default")).thenReturn(tenant);
+        var principal =
+                new LoginUser(
+                        7L, 9L, "admin", "hashed", true, java.util.List.of(), java.util.List.of());
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenReturn(
+                        new UsernamePasswordAuthenticationToken(
+                                principal, null, principal.getAuthorities()));
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("admin", "password")))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INTERNAL_ERROR);
+        verifyNoInteractions(userMapper, jwtTokenProvider, refreshTokenStore);
     }
 
     @Test

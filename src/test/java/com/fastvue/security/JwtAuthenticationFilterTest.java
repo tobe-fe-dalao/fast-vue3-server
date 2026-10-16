@@ -1,6 +1,7 @@
 package com.fastvue.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -39,6 +41,10 @@ class JwtAuthenticationFilterTest {
     @Mock private FilterChain filterChain;
 
     @Mock private Claims claims;
+
+    @Spy
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper =
+            new com.fasterxml.jackson.databind.ObjectMapper();
 
     @InjectMocks private JwtAuthenticationFilter filter;
 
@@ -194,6 +200,91 @@ class JwtAuthenticationFilterTest {
                                         }))
                 .isInstanceOf(jakarta.servlet.ServletException.class);
         assertThat(TenantContext.tenantId()).isNull();
+    }
+
+    @Test
+    void authenticationServiceFailureReturns503WithoutRunningTheHandler() throws Exception {
+        prepareAccessToken();
+        when(userDetailsService.loadUserByUsername("admin"))
+                .thenThrow(
+                        new org.springframework.security.authentication
+                                .InternalAuthenticationServiceException("private backend details"));
+        var response = new MockHttpServletResponse();
+
+        filter.doFilterInternal(bearerRequest("access-token"), response, filterChain);
+
+        assertUnavailable(response);
+    }
+
+    @Test
+    void userDatabaseFailureReturns503WithoutRunningTheHandler() throws Exception {
+        prepareAccessToken();
+        when(userDetailsService.loadUserByUsername("admin"))
+                .thenThrow(
+                        new org.springframework.dao.DataAccessResourceFailureException(
+                                "private JDBC details"));
+        var response = new MockHttpServletResponse();
+
+        filter.doFilterInternal(bearerRequest("access-token"), response, filterChain);
+
+        assertUnavailable(response);
+    }
+
+    @Test
+    void tenantDatabaseFailureReturns503WithoutRunningTheHandler() throws Exception {
+        when(jwtTokenProvider.parse("access-token")).thenReturn(claims);
+        when(claims.get("type")).thenReturn("access");
+        when(claims.get("tenantId", Long.class)).thenReturn(1L);
+        when(tenantMapper.selectById(1L))
+                .thenThrow(
+                        new org.springframework.dao.DataAccessResourceFailureException(
+                                "private JDBC details"));
+        var response = new MockHttpServletResponse();
+
+        filter.doFilterInternal(bearerRequest("access-token"), response, filterChain);
+
+        assertUnavailable(response);
+        verifyNoInteractions(userDetailsService);
+    }
+
+    @Test
+    void downstreamDatabaseFailureIsNotReclassifiedAsAuthenticationFailure() {
+        var response = new MockHttpServletResponse();
+        var failure = new org.springframework.dao.DataAccessResourceFailureException("downstream");
+
+        assertThatThrownBy(
+                        () ->
+                                filter.doFilterInternal(
+                                        new MockHttpServletRequest(),
+                                        response,
+                                        (req, res) -> {
+                                            throw failure;
+                                        }))
+                .isSameAs(failure);
+        assertThat(response.getContentAsByteArray()).isEmpty();
+        assertThat(TenantContext.tenantId()).isNull();
+    }
+
+    private void prepareAccessToken() {
+        when(jwtTokenProvider.parse("access-token")).thenReturn(claims);
+        when(claims.get("type")).thenReturn("access");
+        when(claims.get("tenantId", Long.class)).thenReturn(1L);
+        when(claims.get("username", String.class)).thenReturn("admin");
+        var tenant = new TenantEntity();
+        tenant.setId(1L);
+        tenant.setStatus("active");
+        when(tenantMapper.selectById(1L)).thenReturn(tenant);
+    }
+
+    private void assertUnavailable(MockHttpServletResponse response) throws Exception {
+        assertThat(response.getStatus()).isEqualTo(503);
+        assertThat(response.getContentType()).startsWith("application/json");
+        assertThat(objectMapper.readTree(response.getContentAsByteArray()).path("code").asInt())
+                .isEqualTo(503);
+        assertThat(response.getContentAsString()).doesNotContain("private", "JDBC", "backend");
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        assertThat(TenantContext.tenantId()).isNull();
+        verifyNoInteractions(filterChain);
     }
 
     private MockHttpServletRequest bearerRequest(String token) {

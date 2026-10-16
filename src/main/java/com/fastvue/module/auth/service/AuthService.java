@@ -23,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
 
@@ -49,10 +50,12 @@ public class AuthService {
     }
 
     private TokenResponse doLogin(LoginRequest request) {
+        Authentication authentication;
         try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            request.username(), request.password()));
+            authentication =
+                    authenticationManager.authenticate(
+                            new UsernamePasswordAuthenticationToken(
+                                    request.username(), request.password()));
         } catch (org.springframework.security.authentication.AuthenticationServiceException ex) {
             log.error("Authentication service unavailable ({})", ex.getClass().getSimpleName());
             throw new BusinessException(ErrorCode.SERVICE_UNAVAILABLE);
@@ -66,26 +69,25 @@ public class AuthService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        UserEntity user =
-                userMapper.selectOne(
-                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
-                                        UserEntity>()
-                                .eq(UserEntity::getUsername, request.username()));
-        if (user == null) {
-            throw new BusinessException(ErrorCode.INVALID_USERNAME_OR_PASSWORD);
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || !(authentication.getPrincipal() instanceof LoginUser user)
+                || !java.util.Objects.equals(user.tenantId(), TenantContext.tenantId())) {
+            log.error("Authentication provider returned an unexpected principal");
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
 
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getUsername());
+        String accessToken = jwtTokenProvider.generateAccessToken(user.id(), user.getUsername());
         JwtTokenProvider.TokenPair refreshPair =
-                jwtTokenProvider.generateRefreshToken(user.getId(), user.getUsername());
+                jwtTokenProvider.generateRefreshToken(user.id(), user.getUsername());
 
         refreshTokenStore.save(
-                user.getId(),
+                user.id(),
                 refreshPair.jti(),
                 user.getUsername(),
                 Duration.ofSeconds(jwtTokenProvider.refreshTokenTtlSeconds()));
 
-        log.info("用户登录成功 userId={}", user.getId());
+        log.info("用户登录成功 userId={}", user.id());
         return new TokenResponse(
                 accessToken, refreshPair.token(), jwtTokenProvider.accessTokenTtlSeconds());
     }

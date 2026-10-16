@@ -70,6 +70,9 @@ class ProductionIntegrationTest {
     @Autowired com.fastvue.module.organization.service.DepartmentService departments;
     @Autowired PlatformTransactionManager transactionManager;
 
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    com.fastvue.module.user.persistence.UserMapper userMapper;
+
     @AfterEach
     void clear() {
         TenantContext.clear();
@@ -294,6 +297,144 @@ class ProductionIntegrationTest {
                                 Integer.class,
                                 key))
                 .isEqualTo(1);
+    }
+
+    @Test
+    void loginLoadsTheAuthenticatedUserOnlyOnce() {
+        org.mockito.Mockito.clearInvocations(userMapper);
+
+        login();
+
+        org.mockito.Mockito.verify(userMapper, org.mockito.Mockito.times(1))
+                .selectOne(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void jwtDatabaseFailureReturns503WithCorrelationAndCorsHeaders() {
+        var headers = new HttpHeaders();
+        headers.setBearerAuth((String) login().get("accessToken"));
+        headers.setOrigin("https://app.example.com");
+        headers.set("X-Request-Id", "jwt-infrastructure-failure");
+        org.mockito.Mockito.doThrow(
+                        new org.springframework.dao.DataAccessResourceFailureException(
+                                "private database credentials"))
+                .when(userMapper)
+                .selectOne(org.mockito.ArgumentMatchers.any());
+
+        var response =
+                http.exchange(
+                        "/api/v1/auth/me", HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getHeaders().getFirst("X-Request-Id"))
+                .isEqualTo("jwt-infrastructure-failure");
+        assertThat(response.getHeaders().getAccessControlAllowOrigin())
+                .isEqualTo("https://app.example.com");
+        assertThat(response.getBody())
+                .contains("\"code\":503")
+                .doesNotContain("private", "database", "credentials");
+    }
+
+    @Test
+    void projectLockRefreshesStateReadBeforeAnotherTransactionArchivedTheProject() {
+        authenticate();
+        var project =
+                projects.create(
+                        new ProjectModels.CreateRequest(
+                                "Cache race", UUID.randomUUID().toString(), null, null, null));
+        var concurrent = new TransactionTemplate(transactionManager);
+        concurrent.setPropagationBehavior(
+                org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        new TransactionTemplate(transactionManager)
+                .executeWithoutResult(
+                        status -> {
+                            assertThat(projects.requireAccessible(project.id()).getStatus())
+                                    .isEqualTo("ACTIVE");
+                            concurrent.executeWithoutResult(
+                                    other -> projects.archive(project.id(), project.version()));
+
+                            assertThat(projects.lockForMutation(project.id()).getStatus())
+                                    .isEqualTo("ARCHIVED");
+                            assertThatThrownBy(
+                                            () ->
+                                                    tasks.create(
+                                                            project.id(),
+                                                            new TaskModels.CreateRequest(
+                                                                    "Too late",
+                                                                    null,
+                                                                    null,
+                                                                    null,
+                                                                    null)))
+                                    .isInstanceOf(
+                                            com.fastvue.common.exception.BusinessException.class)
+                                    .extracting(
+                                            ex ->
+                                                    ((com.fastvue.common.exception
+                                                                            .BusinessException)
+                                                                    ex)
+                                                            .getErrorCode())
+                                    .isEqualTo(
+                                            com.fastvue.common.exception.ErrorCode
+                                                    .ILLEGAL_STATE_TRANSITION);
+                            status.setRollbackOnly();
+                        });
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM biz_task WHERE project_id=?",
+                                Long.class,
+                                project.id()))
+                .isZero();
+    }
+
+    @Test
+    void projectLockRechecksMembershipAfterAnotherTransactionRemovedTheMember() {
+        authenticate();
+        var project =
+                projects.create(
+                        new ProjectModels.CreateRequest(
+                                "Membership cache race",
+                                UUID.randomUUID().toString(),
+                                null,
+                                null,
+                                null));
+        Long memberId = newUser();
+        projects.addMember(project.id(), memberId);
+        var member = new LoginUser(memberId, 1L, "member", "unused", true, List.of(), List.of());
+        TenantContext.set(1L, false);
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(member, null, List.of()));
+        var concurrent = new TransactionTemplate(transactionManager);
+        concurrent.setPropagationBehavior(
+                org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        new TransactionTemplate(transactionManager)
+                .executeWithoutResult(
+                        status -> {
+                            assertThat(projects.requireAccessible(project.id())).isNotNull();
+                            concurrent.executeWithoutResult(
+                                    other ->
+                                            TenantContext.runAs(
+                                                    1L,
+                                                    true,
+                                                    () ->
+                                                            projects.removeMember(
+                                                                    project.id(), memberId)));
+
+                            assertThatThrownBy(() -> projects.lockForMutation(project.id()))
+                                    .isInstanceOf(
+                                            com.fastvue.common.exception.BusinessException.class)
+                                    .extracting(
+                                            ex ->
+                                                    ((com.fastvue.common.exception
+                                                                            .BusinessException)
+                                                                    ex)
+                                                            .getErrorCode())
+                                    .isEqualTo(
+                                            com.fastvue.common.exception.ErrorCode
+                                                    .PROJECT_NOT_FOUND);
+                        });
     }
 
     @Test

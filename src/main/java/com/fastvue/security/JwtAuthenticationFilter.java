@@ -1,5 +1,8 @@
 package com.fastvue.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fastvue.common.exception.ErrorCode;
+import com.fastvue.common.response.ApiResponse;
 import com.fastvue.infrastructure.tenant.TenantContext;
 import com.fastvue.module.tenant.persistence.TenantEntity;
 import com.fastvue.module.tenant.persistence.TenantMapper;
@@ -12,6 +15,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -27,12 +34,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * 认证信息写入 {@link SecurityContextHolder}，供后续授权判断使用。</p>
  */
 @Component
+@Slf4j
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserDetailsService userDetailsService;
     private final TenantMapper tenantMapper;
+    private final ObjectMapper objectMapper;
 
     @Override
     protected void doFilterInternal(
@@ -41,7 +50,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         TenantContext.clear();
         try {
-            authenticate(request);
+            try {
+                authenticate(request);
+            } catch (AuthenticationServiceException | DataAccessException ex) {
+                SecurityContextHolder.clearContext();
+                TenantContext.clear();
+                log.error("JWT authentication unavailable ({})", ex.getClass().getSimpleName());
+                response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                response.setCharacterEncoding("UTF-8");
+                objectMapper.writeValue(
+                        response.getWriter(), ApiResponse.error(ErrorCode.SERVICE_UNAVAILABLE));
+                return;
+            }
             filterChain.doFilter(request, response);
         } finally {
             TenantContext.clear();
@@ -87,6 +108,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             request.setAttribute("requestTenantId", tenantId);
             if (userDetails instanceof LoginUser user)
                 request.setAttribute("requestUserId", user.id());
+        } catch (AuthenticationServiceException ex) {
+            throw ex;
         } catch (JwtException
                 | IllegalArgumentException
                 | org.springframework.security.core.AuthenticationException ex) {

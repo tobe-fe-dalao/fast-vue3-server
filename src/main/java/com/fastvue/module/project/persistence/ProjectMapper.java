@@ -6,7 +6,10 @@ import org.apache.ibatis.annotations.*;
 
 @Mapper
 public interface ProjectMapper extends BaseMapper<ProjectEntity> {
+    // Recheck project state and membership from the database after acquiring the lock.
+    // Earlier reads in this transaction may predate another writer's commit.
     @Select("SELECT id FROM biz_project WHERE id = #{id} AND deleted = false FOR UPDATE")
+    @Options(flushCache = Options.FlushCachePolicy.TRUE)
     Long lockById(@Param("id") Long id);
 
     @Select("SELECT user_id FROM biz_project_member WHERE project_id = #{projectId}")
