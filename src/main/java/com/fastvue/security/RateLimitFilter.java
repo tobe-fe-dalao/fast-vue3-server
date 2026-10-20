@@ -1,6 +1,5 @@
 package com.fastvue.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fastvue.common.exception.ErrorCode;
 import com.fastvue.common.response.ApiResponse;
 import jakarta.servlet.*;
@@ -13,6 +12,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
+import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @RequiredArgsConstructor

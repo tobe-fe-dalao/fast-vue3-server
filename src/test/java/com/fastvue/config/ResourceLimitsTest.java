@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import jakarta.validation.Validation;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
+import org.springframework.boot.servlet.autoconfigure.MultipartProperties;
 import org.springframework.util.unit.DataSize;
 
 class ResourceLimitsTest {

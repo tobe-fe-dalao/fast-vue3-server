@@ -186,7 +186,7 @@ public class UserService {
                             : TenantContext.runAs(
                                     entity.getTenantId(),
                                     false,
-                                    () -> roleMapper.selectBatchIds(uniqueRoleIds).size());
+                                    () -> roleMapper.selectByIds(uniqueRoleIds).size());
             if (existingRoles != uniqueRoleIds.size()) {
                 throw new BusinessException(ErrorCode.ROLE_NOT_FOUND, "角色不存在或不属于当前租户");
             }

@@ -4,7 +4,7 @@
 
 Fast Vue3 的 Java 後端，提供共用 `/api/v1` 契約。
 
-技術基線為 Java 21、Spring Boot 3.5.16、Spring MVC/Security、MyBatis-Plus、PostgreSQL 16、Redis 7、Flyway、JUnit 5 與 Testcontainers。保留 `module/<領域>/{api,service,persistence}`，Controller 回傳 DTO，Service 管理業務與交易。
+技術基線為 Java 21、Spring Boot 4.0.9、Spring MVC/Security、MyBatis-Plus、PostgreSQL 16、Redis 7、Flyway、JUnit 6 與 Testcontainers。保留 `module/<領域>/{api,service,persistence}`，Controller 回傳 DTO，Service 管理業務與交易。
 
 [Documentation](https://tobe-fe-dalao.github.io/fast-vue3-site/zh-TW/server/) · [Configuration](https://tobe-fe-dalao.github.io/fast-vue3-site/zh-TW/server/guide/configuration) · [API contracts](https://tobe-fe-dalao.github.io/fast-vue3-site/zh-TW/server/api/contracts)
 

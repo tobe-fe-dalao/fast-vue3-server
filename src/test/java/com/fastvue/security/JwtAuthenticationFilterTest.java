@@ -43,8 +43,8 @@ class JwtAuthenticationFilterTest {
     @Mock private Claims claims;
 
     @Spy
-    private com.fasterxml.jackson.databind.ObjectMapper objectMapper =
-            new com.fasterxml.jackson.databind.ObjectMapper();
+    private tools.jackson.databind.ObjectMapper objectMapper =
+            new tools.jackson.databind.ObjectMapper();
 
     @InjectMocks private JwtAuthenticationFilter filter;
 

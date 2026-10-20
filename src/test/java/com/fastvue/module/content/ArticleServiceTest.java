@@ -55,13 +55,13 @@ class ArticleServiceTest {
         var category = new CategoryEntity();
         category.setId(7L);
         category.setName("News");
-        when(categories.selectBatchIds(List.of(7L))).thenReturn(List.of(category));
+        when(categories.selectByIds(List.of(7L))).thenReturn(List.of(category));
         var result = service.page(new ArticleQueryRequest("news", "published", 7L, 2L, 10L));
         assertThat(result.getTotal()).isEqualTo(12);
         assertThat(result.getRecords())
                 .extracting(ArticleVO::category)
                 .containsExactly("News", "News", "");
-        verify(categories).selectBatchIds(List.of(7L));
+        verify(categories).selectByIds(List.of(7L));
         verify(categories, never()).selectById(any(Long.class));
     }
 

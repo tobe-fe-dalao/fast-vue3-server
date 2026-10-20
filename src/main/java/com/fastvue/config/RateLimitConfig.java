@@ -1,9 +1,9 @@
 package com.fastvue.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fastvue.security.RateLimitFilter;
 import org.springframework.context.annotation.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 public class RateLimitConfig {

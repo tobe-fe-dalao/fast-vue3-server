@@ -1,11 +1,10 @@
 package com.fastvue.config;
 
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.util.TimeZone;
-import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
+import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import tools.jackson.databind.cfg.DateTimeFeature;
 
 /**
  * Jackson 配置。
@@ -16,11 +15,10 @@ import org.springframework.context.annotation.Configuration;
 public class JacksonConfig {
 
     @Bean
-    public Jackson2ObjectMapperBuilderCustomizer jacksonCustomizer() {
+    public JsonMapperBuilderCustomizer jacksonCustomizer() {
         return builder -> {
-            builder.modules(new JavaTimeModule());
-            builder.featuresToDisable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-            builder.timeZone(TimeZone.getTimeZone("UTC"));
+            builder.disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS);
+            builder.defaultTimeZone(TimeZone.getTimeZone("UTC"));
         };
     }
 }

@@ -4,7 +4,7 @@
 
 Official Java backend for Fast Vue3, using a shared `/api/v1` contract.
 
-Java 21, Spring Boot 3.5.16, Spring MVC/Security, MyBatis-Plus, PostgreSQL 16, Redis 7, Flyway, JUnit 5 and Testcontainers. Modules stay in `module/<domain>/{api,service,persistence}`; controllers expose DTOs and services own transactions.
+Java 21, Spring Boot 4.0.9, Spring MVC/Security, MyBatis-Plus, PostgreSQL 16, Redis 7, Flyway, JUnit 6 and Testcontainers. Modules stay in `module/<domain>/{api,service,persistence}`; controllers expose DTOs and services own transactions.
 
 [Documentation](https://tobe-fe-dalao.github.io/fast-vue3-site/en/server/) · [Configuration](https://tobe-fe-dalao.github.io/fast-vue3-site/en/server/guide/configuration) · [API contracts](https://tobe-fe-dalao.github.io/fast-vue3-site/en/server/api/contracts)
 

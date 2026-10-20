@@ -1,7 +1,6 @@
 package com.fastvue.infrastructure.tenant;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fastvue.common.exception.ErrorCode;
 import com.fastvue.common.response.ApiResponse;
 import com.fastvue.module.tenant.persistence.TenantEntity;
@@ -16,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Resolves tenant identity for anonymous public APIs.

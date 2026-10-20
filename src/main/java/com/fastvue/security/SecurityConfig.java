@@ -1,6 +1,5 @@
 package com.fastvue.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fastvue.common.exception.ErrorCode;
 import com.fastvue.common.response.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,6 +21,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Spring Security 核心配置。

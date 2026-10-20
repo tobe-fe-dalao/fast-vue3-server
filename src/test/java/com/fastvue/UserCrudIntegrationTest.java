@@ -1,6 +1,10 @@
 package com.fastvue;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fastvue.infrastructure.tenant.TenantContext;
 import com.fastvue.module.user.persistence.UserEntity;
@@ -12,6 +16,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -43,10 +49,28 @@ class UserCrudIntegrationTest {
     }
 
     @Autowired private UserMapper userMapper;
+    @Autowired private WebApplicationContext webContext;
 
     @BeforeAll
     static void verifyContainerRunning() {
         assertThat(POSTGRES.isRunning()).isTrue();
+    }
+
+    @Test
+    void developmentDocumentationRendersAllLocalesWithBoot4() throws Exception {
+        // Exercise Springdoc and MVC wiring; real filter-chain behavior is tested in prod.
+        var mvc = MockMvcBuilders.webAppContextSetup(webContext).build();
+        for (String locale : java.util.List.of("zh-CN", "ja-JP", "en-US")) {
+            mvc.perform(get("/v3/api-docs/" + locale))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.paths['/api/v1/auth/login'].post").exists())
+                    .andExpect(
+                            jsonPath("$.components.securitySchemes.bearerAuth.scheme")
+                                    .value("bearer"));
+        }
+        mvc.perform(get("/swagger-ui.html"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/api-docs-ui/index.html"));
     }
 
     @Test

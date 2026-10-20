@@ -49,7 +49,7 @@ public class DepartmentService {
         requireDepartment(departmentId);
         List<Long> ids = departmentMapper.selectMemberIds(departmentId);
         if (ids.isEmpty()) return List.of();
-        return userMapper.selectBatchIds(ids).stream()
+        return userMapper.selectByIds(ids).stream()
                 .map(
                         user ->
                                 new MemberVO(

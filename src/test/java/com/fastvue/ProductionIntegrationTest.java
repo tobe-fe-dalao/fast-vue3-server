@@ -15,10 +15,11 @@ import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.DefaultApplicationArguments;
+import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.*;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -30,8 +31,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.*;
 
 @Testcontainers
+@org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate
 @ActiveProfiles("prod")
-@org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability
+@org.springframework.boot.micrometer.metrics.test.autoconfigure.AutoConfigureMetrics
 @org.springframework.test.annotation.DirtiesContext(
         classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @SpringBootTest(
@@ -1403,24 +1405,20 @@ class ProductionIntegrationTest {
         var response =
                 http.postForEntity("/api/v1/files", new HttpEntity<>(body, headers), String.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        try {
-            String json = response.getBody();
-            assertThat(json).contains("10485760");
-            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            String key = mapper.readTree(json).path("data").path("key").asText();
-            var deleteHeaders = new HttpHeaders();
-            deleteHeaders.setBearerAuth(headers.getFirst(HttpHeaders.AUTHORIZATION).substring(7));
-            assertThat(
-                            http.exchange(
-                                            "/api/v1/files/" + key,
-                                            HttpMethod.DELETE,
-                                            new HttpEntity<>(deleteHeaders),
-                                            String.class)
-                                    .getStatusCode())
-                    .isEqualTo(HttpStatus.OK);
-        } catch (java.io.IOException ex) {
-            throw new IllegalStateException(ex);
-        }
+        String json = response.getBody();
+        assertThat(json).contains("10485760");
+        var mapper = new tools.jackson.databind.ObjectMapper();
+        String key = mapper.readTree(json).path("data").path("key").asString();
+        var deleteHeaders = new HttpHeaders();
+        deleteHeaders.setBearerAuth(headers.getFirst(HttpHeaders.AUTHORIZATION).substring(7));
+        assertThat(
+                        http.exchange(
+                                        "/api/v1/files/" + key,
+                                        HttpMethod.DELETE,
+                                        new HttpEntity<>(deleteHeaders),
+                                        String.class)
+                                .getStatusCode())
+                .isEqualTo(HttpStatus.OK);
         var oversized =
                 new org.springframework.core.io.ByteArrayResource(new byte[bytes.length + 1]) {
                     @Override
@@ -1435,7 +1433,7 @@ class ProductionIntegrationTest {
                                         new HttpEntity<>(body, headers),
                                         String.class)
                                 .getStatusCode())
-                .isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+                .isEqualTo(HttpStatus.CONTENT_TOO_LARGE);
     }
 
     @Test

@@ -272,7 +272,7 @@ class DepartmentServiceTest {
         var user = new UserEntity();
         user.setId(7L);
         user.setUsername("member");
-        when(users.selectBatchIds(java.util.List.of(7L))).thenReturn(java.util.List.of(user));
+        when(users.selectByIds(java.util.List.of(7L))).thenReturn(java.util.List.of(user));
         assertThat(service.members(20L))
                 .extracting(com.fastvue.module.organization.api.DepartmentModels.MemberVO::username)
                 .containsExactly("member");

@@ -26,6 +26,7 @@ spring:
       repositories:
         enabled: false
   jackson:
+    use-jackson2-defaults: true
     default-property-inclusion: non_null
   servlet:
     multipart:

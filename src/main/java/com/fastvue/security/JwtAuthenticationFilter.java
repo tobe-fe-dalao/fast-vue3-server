@@ -1,6 +1,5 @@
 package com.fastvue.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fastvue.common.exception.ErrorCode;
 import com.fastvue.common.response.ApiResponse;
 import com.fastvue.infrastructure.tenant.TenantContext;
@@ -26,6 +25,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * JWT 认证过滤器。

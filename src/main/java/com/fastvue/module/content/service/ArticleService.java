@@ -175,7 +175,7 @@ public class ArticleService {
                         .distinct()
                         .toList();
         if (ids.isEmpty()) return Map.of();
-        return categoryMapper.selectBatchIds(ids).stream()
+        return categoryMapper.selectByIds(ids).stream()
                 .collect(
                         Collectors.toMap(
                                 CategoryEntity::getId,

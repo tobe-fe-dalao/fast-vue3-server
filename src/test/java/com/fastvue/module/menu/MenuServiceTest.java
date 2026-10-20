@@ -3,6 +3,8 @@ package com.fastvue.module.menu;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.fastvue.common.exception.BusinessException;
 import com.fastvue.infrastructure.tenant.TenantContext;
 import com.fastvue.module.menu.api.*;
@@ -10,6 +12,7 @@ import com.fastvue.module.menu.persistence.*;
 import com.fastvue.module.menu.service.*;
 import com.fastvue.module.user.service.UserService;
 import java.util.List;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -20,6 +23,12 @@ class MenuServiceTest {
     @Mock MenuMapper mapper;
     @Mock UserService users;
     MenuService service;
+
+    @BeforeAll
+    static void initializeLambdaColumnMetadata() {
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), ""), MenuEntity.class);
+    }
 
     @BeforeEach
     void setup() {
