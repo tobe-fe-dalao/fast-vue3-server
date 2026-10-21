@@ -12,7 +12,7 @@ RUN --mount=type=cache,target=/root/.m2 \
     ./mvnw -q -B clean package -DskipTests
 
 # ---- Runtime stage ----
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 RUN addgroup -S -g 10001 app && adduser -S -u 10001 -G app app \
     && mkdir -p /app/uploads && chown -R app:app /app
